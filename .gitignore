@@ -13,7 +13,7 @@ env/
 *.exe
 *.msi
 
-# Streamlit
+# Streamlit — secrets nunca vão para o repositório
 .streamlit/secrets.toml
 
 # OS

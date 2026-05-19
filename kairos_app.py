@@ -10,11 +10,65 @@ Pipeline linha a linha:
 
 import os
 
+import streamlit as st
+
+
+# ---------------------------------------------------------------------------
+# Authentication — runs before any heavy import or UI rendering
+# ---------------------------------------------------------------------------
+
+def _login_gate() -> None:
+    """Exibe formulário de login e bloqueia o app se não autenticado."""
+    if st.session_state.get("logged_in"):
+        return
+
+    st.set_page_config(
+        page_title="Kairos DSS — Acesso Restrito",
+        page_icon="🔒",
+        layout="centered",
+    )
+
+    st.markdown(
+        "<h2 style='text-align:center;margin-bottom:0'>🌱 Kairos DSS</h2>"
+        "<p style='text-align:center;color:#666;margin-top:4px'>"
+        "Sistema de Apoio à Decisão — Replantio de Cana-de-Açúcar</p>",
+        unsafe_allow_html=True,
+    )
+    st.divider()
+
+    with st.form("form_login"):
+        st.subheader("Acesso restrito")
+        usuario = st.text_input("Usuário")
+        senha   = st.text_input("Senha", type="password")
+        entrar  = st.form_submit_button("Entrar", use_container_width=True, type="primary")
+
+    if entrar:
+        try:
+            usuarios_auth: dict = dict(st.secrets["usuarios"])
+        except Exception:
+            st.error("Configuração de autenticação ausente. Contate o administrador.")
+            st.stop()
+
+        if usuario in usuarios_auth and usuarios_auth[usuario] == senha:
+            st.session_state["logged_in"] = True
+            st.rerun()
+        else:
+            st.error("Usuário ou senha incorretos. Tente novamente.")
+
+    st.stop()
+
+
+_login_gate()
+
+
+# ---------------------------------------------------------------------------
+# Deferred imports — only reached after successful authentication
+# ---------------------------------------------------------------------------
+
 import folium
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import streamlit as st
 from streamlit_folium import st_folium
 
 import economic_engine as eco
@@ -622,6 +676,7 @@ def main() -> None:
         layout="wide",
         initial_sidebar_state="expanded",
     )
+
 
     st.markdown(
         "<h1 style='margin-bottom:0'>🌱 Kairos DSS</h1>"
