@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>
+Kairos Econômico Operacional
+</title>
+
+<style>
+
+body{
+    font-family:Arial;
+    margin:40px;
+    background:#f5f5f5;
+}
+
+.container{
+    background:white;
+    padding:20px;
+    border-radius:10px;
+}
+
+input{
+    padding:8px;
+    margin:5px;
+    width:120px;
+}
+
+button{
+    padding:10px 20px;
+    margin-top:10px;
+    margin-right:10px;
+    cursor:pointer;
+}
+
+table{
+    border-collapse:collapse;
+    width:100%;
+    margin-top:20px;
+}
+
+th,td{
+    border:1px solid #ccc;
+    padding:8px;
+    text-align:left;
+}
+
+th{
+    background:#eee;
+}
+
+.positivo{
+    background:#d4edda;
+}
+
+.negativo{
+    background:#f8d7da;
+}
+
+.debug{
+    background:#222;
+    color:#0f0;
+    padding:10px;
+    margin-top:20px;
+    font-size:12px;
+    overflow:auto;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>
+Kairos - Modelo Econômico Operacional
+</h1>
+
+<h3>
+Importar CSV exportado do QGIS
+</h3>
+
+<input type="file" id="csvFile">
+
+<hr>
+
+<h3>
+Custos Operacionais (R$/ha)
+</h3>
+
+<div>
+
+Diesel:
+<input type="number"
+id="diesel"
+value="12">
+
+Operador:
+<input type="number"
+id="operador"
+value="15">
+
+Manutenção:
+<input type="number"
+id="manutencao"
+value="8">
+
+Muda:
+<input type="number"
+id="muda"
+value="40">
+
+Máquina:
+<input type="number"
+id="maquina"
+value="20">
+
+</div>
+
+<hr>
+
+<h3>
+Espaçamento entre linhas
+</h3>
+
+<div>
+
+Espaçamento (m):
+<input type="number"
+id="espacamento"
+value="1.5"
+step="0.1">
+
+</div>
+
+<hr>
+
+<h3>
+Eficiência Operacional
+</h3>
+
+<div>
+
+Manobra (min):
+<input type="number"
+id="manobra"
+value="8">
+
+Deslocamento (min):
+<input type="number"
+id="deslocamento"
+value="5">
+
+Abastecimento (min):
+<input type="number"
+id="abastecimento"
+value="4">
+
+</div>
+
+<hr>
+
+<h3>
+Produção
+</h3>
+
+<div>
+
+Produtividade (t/ha):
+<input type="number"
+id="produtividade"
+value="80">
+
+Preço tonelada:
+<input type="number"
+id="preco"
+value="140">
+
+</div>
+
+<br>
+
+<button onclick="calcular()">
+Calcular Viabilidade
+</button>
+
+<button onclick="exportarCSV()">
+Exportar CSV Viável
+</button>
+
+<div id="resultado"></div>
+
+<div id="debug" class="debug"></div>
+
+</div>
+
+<script>
+
+let dadosCSV = [];
+
+let resultadosViaveis = [];
+
+document
+.getElementById('csvFile')
+.addEventListener('change', function(e){
+
+    const file = e.target.files[0];
+
+    if(!file){
+
+        alert(
+        'Nenhum arquivo selecionado'
+        );
+
+        return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = function(event){
+
+        const texto = event.target.result;
+
+        processarCSV(texto);
+    };
+
+    reader.readAsText(file);
+});
+
+function processarCSV(texto){
+
+    const linhas = texto
+    .trim()
+    .split('\n');
+
+    if(linhas.length < 2){
+
+        alert('CSV vazio');
+
+        return;
+    }
+
+    const cabecalho = linhas[0]
+    .split(',')
+    .map(c =>
+        c
+        .trim()
+        .replace('\ufeff','')
+    );
+
+    dadosCSV = [];
+
+    for(let i=1;i<linhas.length;i++){
+
+        const valores = linhas[i]
+        .split(',');
+
+        let obj = {};
+
+        cabecalho.forEach((c,index)=>{
+
+            let valor = valores[index];
+
+            if(valor){
+
+                valor = valor
+                .trim()
+                .replace(',','.');
+            }
+
+            obj[c] = valor;
+        });
+
+        dadosCSV.push(obj);
+    }
+
+    document
+    .getElementById('debug')
+    .innerHTML = `
+
+    <b>CSV carregado</b><br>
+
+    Linhas:
+    ${dadosCSV.length}
+
+    <br><br>
+
+    <b>Colunas encontradas:</b><br>
+
+    ${cabecalho.join('<br>')}
+    `;
+
+    alert(
+    'CSV carregado com sucesso'
+    );
+}
+
+function percentualClasse(classe){
+
+    if(!classe) return 0;
+
+    classe = classe.toString();
+
+    if(classe.includes('>20')){
+
+        return 22;
+    }
+
+    const partes = classe.split('-');
+
+    if(partes.length !== 2){
+
+        return 0;
+    }
+
+    const a = parseFloat(partes[0]);
+    const b = parseFloat(partes[1]);
+
+    if(isNaN(a) || isNaN(b)){
+
+        return 0;
+    }
+
+    return (a+b)/2;
+}
+
+function calcular(){
+
+    resultadosViaveis = [];
+
+    if(dadosCSV.length === 0){
+
+        alert(
+        'Importe um CSV primeiro'
+        );
+
+        return;
+    }
+
+    const diesel =
+    parseFloat(
+    document.getElementById('diesel').value);
+
+    const operador =
+    parseFloat(
+    document.getElementById('operador').value);
+
+    const manutencao =
+    parseFloat(
+    document.getElementById('manutencao').value);
+
+    const muda =
+    parseFloat(
+    document.getElementById('muda').value);
+
+    const maquina =
+    parseFloat(
+    document.getElementById('maquina').value);
+
+    const espacamento =
+    parseFloat(
+    document.getElementById('espacamento').value);
+
+    const manobra =
+    parseFloat(
+    document.getElementById('manobra').value);
+
+    const deslocamento =
+    parseFloat(
+    document.getElementById('deslocamento').value);
+
+    const abastecimento =
+    parseFloat(
+    document.getElementById('abastecimento').value);
+
+    const produtividade =
+    parseFloat(
+    document.getElementById('produtividade').value);
+
+    const preco =
+    parseFloat(
+    document.getElementById('preco').value);
+
+    const custoHa =
+    diesel +
+    operador +
+    manutencao +
+    muda +
+    maquina;
+
+    const valorHa =
+    produtividade *
+    preco;
+
+    let html = '';
+
+    html += `
+
+    <table>
+
+    <tr>
+
+    <th>Talhão</th>
+
+    <th>Classe</th>
+
+    <th>Metros</th>
+
+    <th>Área Eq. (ha)</th>
+
+    <th>% Falha</th>
+
+    <th>Tempo Operacional</th>
+
+    <th>Valor Recuperável</th>
+
+    <th>Custo</th>
+
+    <th>Lucro</th>
+
+    <th>Viável</th>
+
+    </tr>
+    `;
+
+    let linhasValidas = 0;
+
+    dadosCSV.forEach(r=>{
+
+        const talhao =
+        r.TALHAO ||
+        r.talhao ||
+        'Sem Talhão';
+
+        const classe =
+        r.classe ||
+        'Sem Classe';
+
+        const metros =
+        parseFloat(
+        r.comp_linha ||
+        r.sum ||
+        r.metros ||
+        0
+        );
+
+        if(
+            isNaN(metros) ||
+            metros <= 0
+        ){
+            return;
+        }
+
+        linhasValidas++;
+
+        const perc =
+        percentualClasse(classe);
+
+        const area =
+        (metros * espacamento) / 10000;
+
+        const tempoOperacional =
+        manobra +
+        deslocamento +
+        abastecimento;
+
+        const valorRecuperavel =
+        valorHa *
+        (perc/100) *
+        area *
+        0.8;
+
+        const custo =
+        (custoHa * area) +
+        tempoOperacional;
+
+        const lucro =
+        valorRecuperavel -
+        custo;
+
+        const viavel =
+        lucro > 0;
+
+        if(viavel){
+
+            resultadosViaveis.push({
+
+                TALHAO: talhao,
+
+                classe: classe,
+
+                metros: metros,
+
+                area: area,
+
+                percentual: perc,
+
+                custo: custo,
+
+                lucro: lucro,
+
+                Viável: 'SIM'
+            });
+        }
+
+        html += `
+
+        <tr class="${
+        viavel ?
+        'positivo' :
+        'negativo'
+        }">
+
+        <td>${talhao}</td>
+
+        <td>${classe}</td>
+
+        <td>${metros.toFixed(0)}</td>
+
+        <td>${area.toFixed(2)}</td>
+
+        <td>${perc.toFixed(1)}%</td>
+
+        <td>${tempoOperacional.toFixed(1)} min</td>
+
+        <td>
+        R$ ${valorRecuperavel.toFixed(2)}
+        </td>
+
+        <td>
+        R$ ${custo.toFixed(2)}
+        </td>
+
+        <td>
+        R$ ${lucro.toFixed(2)}
+        </td>
+
+        <td>
+        ${viavel ? 'SIM':'NÃO'}
+        </td>
+
+        </tr>
+        `;
+    });
+
+    html += '</table>';
+
+    if(linhasValidas === 0){
+
+        html = `
+
+        <h2>
+        Nenhuma linha válida encontrada
+        </h2>
+
+        <p>
+        O CSV precisa conter:
+        </p>
+
+        <ul>
+
+        <li>TALHAO</li>
+
+        <li>classe</li>
+
+        <li>comp_linha OU sum</li>
+
+        </ul>
+        `;
+    }
+
+    document
+    .getElementById('resultado')
+    .innerHTML = html;
+
+    document
+    .getElementById('debug')
+    .innerHTML += `
+
+    <br><br>
+
+    <b>Linhas válidas:</b>
+
+    ${linhasValidas}
+
+    <br><br>
+
+    <b>Linhas viáveis exportáveis:</b>
+
+    ${resultadosViaveis.length}
+    `;
+}
+
+function exportarCSV(){
+
+    if(resultadosViaveis.length === 0){
+
+        alert(
+        'Nenhum resultado viável encontrado'
+        );
+
+        return;
+    }
+
+    let csv =
+'TALHAO,classe,metros,area,percentual,custo,lucro,Viavel\n';
+
+    resultadosViaveis.forEach(r=>{
+
+        csv +=
+`${r.TALHAO},${r.classe},${r.metros},${r.area},${r.percentual},${r.custo},${r.lucro},SIM\n`;
+
+    });
+
+    const blob = new Blob(
+        [csv],
+        {
+            type:'text/csv;charset=utf-8;'
+        }
+    );
+
+    const link =
+    document.createElement('a');
+
+    link.href =
+    URL.createObjectURL(blob);
+
+    link.download =
+    'resultado_viavel.csv';
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    document.body.removeChild(link);
+
+    alert(
+    'CSV exportado corretamente'
+    );
+}
+
+
+
+</script>
+
+</body>
+
+</html>
