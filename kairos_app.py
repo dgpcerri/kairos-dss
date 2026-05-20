@@ -276,10 +276,16 @@ def render_sidebar() -> dict:
             value=30.0, min_value=0.0, step=5.0, format="%.0f",
             help="Deslocamento médio do trator entre um talhão e outro (carreador, porteira, estrada interna).",
         )
-        reforma_threshold_pct = st.number_input(
-            "Limite de falha para recomendar reforma total (%)",
-            value=35.0, min_value=10.0, max_value=80.0, step=5.0, format="%.0f",
-            help="Talhões onde a % média de falha ultrapassa este valor recebem alerta de reforma.",
+        custo_reforma_ha = st.number_input(
+            "Custo Médio da Reforma (R$/ha)",
+            value=14000.0, min_value=1000.0, step=500.0, format="%.2f",
+            help="Custo total estimado de reformar o talhão inteiro (preparo, mudas, plantio) por hectare.",
+        )
+        limite_custo_reforma_pct = st.number_input(
+            "Limite de Custo Operacional para Reforma (%)",
+            value=80.0, min_value=10.0, max_value=200.0, step=5.0, format="%.0f",
+            help="Se o custo operacional total do Kairos naquele talhão ultrapassar este % "
+                 "do custo de reforma total, sugere-se reforma em vez de replantio.",
         )
 
     # ── Riscos ────────────────────────────────────────────────────────────
@@ -321,7 +327,8 @@ def render_sidebar() -> dict:
         capacidade_carga_m=capacidade_carga_m,
         tempo_recarga_min=tempo_recarga_min,
         tempo_transferencia_talhao_min=tempo_transferencia_talhao_min,
-        reforma_threshold_pct=reforma_threshold_pct,
+        custo_reforma_ha=custo_reforma_ha,
+        limite_custo_reforma_pct=limite_custo_reforma_pct,
         risco_climatico=risco_climatico,
         pasta_saida=pasta_saida.strip(),
     )
@@ -335,6 +342,8 @@ def render_metrics(
     gdf_linhas_eco: gpd.GeoDataFrame,
     gdf_gis: gpd.GeoDataFrame,
     espacamento: float,
+    custo_h: float = 0.0,
+    params: dict | None = None,
 ) -> None:
     n_total   = len(gdf_linhas_eco)
     n_viaveis = int(gdf_linhas_eco["viavel"].sum())
@@ -353,6 +362,20 @@ def render_metrics(
         rendimento_ha_h   = area_viaveis_ha / tempo_h_viaveis if tempo_h_viaveis > 0 else 0.0
     else:
         rendimento_ha_h = 0.0
+
+    # Break-even yield: minimum ha/h to cover machine cost (R$/h)
+    rendimento_min_hah = None
+    if params and custo_h > 0:
+        fator_soca  = eco.FATOR_SOCA.get(params.get("ciclo_soca", "Cana-planta"), 1.0)
+        ganho_aj    = params["ganho_esperado_tha"] * fator_soca
+        preco_ton   = params["atr_medio_kgton"] * params["preco_atr_rs_kg"]
+        peg         = params["taxa_pegamento"] / 100.0
+        risco       = params["risco_climatico"] / 100.0
+        custo_ins   = params["custo_muda_tha"] + params.get("custo_logistica_muda_ha", 0.0)
+        receita_liq_por_ha = ganho_aj * peg * preco_ton * (1.0 - risco)
+        margem_por_ha      = receita_liq_por_ha - custo_ins
+        if margem_por_ha > 0:
+            rendimento_min_hah = custo_h / margem_por_ha
 
     row1 = st.columns(5)
     row1[0].metric("Linhas candidatas",    f"{n_total}")
@@ -374,27 +397,20 @@ def render_metrics(
         f"{rendimento_ha_h:.3f} ha/h",
         help="Área de falha das linhas viáveis ÷ tempo total de operação das linhas viáveis.",
     )
-    # Price breakeven: minimum ATR price at which average viable line breaks even
-    if n_viaveis > 0:
-        mask_v = gdf_linhas_eco["viavel"]
-        area_v   = gdf_linhas_eco.loc[mask_v, "area_falha_ha"].sum()
-        custo_v  = gdf_linhas_eco.loc[mask_v, "custo_total"].sum()
-        ganho_v  = gdf_linhas_eco.loc[mask_v, "area_falha_ha"].sum()
-        # receita_liquida needed = custo_total  →  atr_min = custo / (area × ganho × peg × atr × (1-risco))
-        # We derive minimum preco_atr given fixed ATR medio
-        atr_m   = espacamento  # reuse param name collision — read from gdf instead
-        # Derive from gdf columns already computed:
-        receita_unitaria = (gdf_linhas_eco.loc[mask_v, "receita_liquida"] /
-                            gdf_linhas_eco.loc[mask_v, "area_falha_ha"].replace(0, float("nan"))).mean()
-        custo_unitaria   = (gdf_linhas_eco.loc[mask_v, "custo_total"] /
-                            gdf_linhas_eco.loc[mask_v, "area_falha_ha"].replace(0, float("nan"))).mean()
-        if receita_unitaria > 0:
-            preco_atr_breakeven = custo_unitaria / receita_unitaria
-            row2[2].metric(
-                "Preço ATR mínimo (viabilidade)",
-                f"R$ {preco_atr_breakeven:.2f}/ha falha",
-                help="Custo médio / Receita unitária: preço mínimo por ha de falha para o lucro = 0.",
-            )
+    if rendimento_min_hah is not None:
+        row2[2].metric(
+            "Rendimento Mínimo",
+            f"{rendimento_min_hah:.3f} ha/h",
+            help="Rendimento mínimo de plantio (ha/h) para cobrir todos os custos "
+                 "fixos e variáveis da máquina sem operar no prejuízo. "
+                 "Fórmula: Custo/hora ÷ Margem líquida por ha de falha.",
+        )
+    elif params:
+        row2[2].metric(
+            "Rendimento Mínimo",
+            "Inviável",
+            help="Margem por ha de falha negativa — operação sempre no prejuízo com os parâmetros atuais.",
+        )
 
 
 def _legenda_html() -> str:
@@ -646,7 +662,9 @@ def render_por_talhao(
     gdf_linhas_eco: gpd.GeoDataFrame,
     gdf_gis: gpd.GeoDataFrame,
     espacamento: float,
-    reforma_threshold_pct: float = 35.0,
+    gdf_contorno: gpd.GeoDataFrame | None = None,
+    custo_reforma_ha: float = 14000.0,
+    limite_custo_reforma_pct: float = 80.0,
 ) -> None:
     st.subheader("📊 Resumo por Talhão")
 
@@ -708,15 +726,38 @@ def render_por_talhao(
     resumo["Pct_Viaveis"] = (
         resumo["Linhas_Viaveis"] / resumo["Total_Linhas"] * 100
     ).round(1)
-    # Reforma recommendation
-    perc_media_talhao = (
-        gdf_gis.groupby("TALHAO")["perc_falhas"].mean().reset_index()
-        .rename(columns={"perc_falhas": "_perc_media"})
+    # Custo operacional por talhão (soma do custo de máquina de todas as linhas candidatas)
+    custo_op = (
+        gdf_linhas_eco
+        .groupby("TALHAO", sort=True)["custo_maquina"]
+        .sum()
+        .reset_index()
+        .rename(columns={"custo_maquina": "_custo_op"})
     )
-    resumo = resumo.merge(perc_media_talhao, on="TALHAO", how="left")
-    resumo["Recomendação"] = resumo["_perc_media"].apply(
-        lambda x: "⚠️ REFORMA" if x >= reforma_threshold_pct else "✅ REPLANTIO"
-    )
+    resumo = resumo.merge(custo_op, on="TALHAO", how="left").fillna(0)
+
+    # Área do talhão em ha — vem do contorno dissolvido
+    if gdf_contorno is not None and len(gdf_contorno) > 0:
+        campo_t = [c for c in gdf_contorno.columns if c != "geometry"][0]
+        area_geo = gdf_contorno[[campo_t, "geometry"]].copy()
+        area_geo["_area_ha"] = area_geo.geometry.area / 10_000
+        area_geo = area_geo.rename(columns={campo_t: "TALHAO"})
+        resumo = resumo.merge(area_geo[["TALHAO", "_area_ha"]], on="TALHAO", how="left").fillna(0)
+    else:
+        resumo["_area_ha"] = 0.0
+
+    # Custo total de reforma por talhão
+    resumo["_custo_reforma"] = resumo["_area_ha"] * custo_reforma_ha
+    resumo["_limite_reforma"] = resumo["_custo_reforma"] * (limite_custo_reforma_pct / 100.0)
+
+    def _rec(row):
+        if row["_custo_reforma"] > 0 and row["_custo_op"] >= row["_limite_reforma"]:
+            return "⚠️ SUGERIR REFORMA"
+        return "✅ REPLANTIO"
+
+    resumo["Recomendação"] = resumo.apply(_rec, axis=1)
+    resumo["Custo Op. (R$)"]    = resumo["_custo_op"]
+    resumo["Custo Reforma (R$)"] = resumo["_custo_reforma"]
 
     resumo = resumo.rename(columns={
         "TALHAO":          "Talhão",
@@ -734,6 +775,7 @@ def render_por_talhao(
     col_order = [
         "Talhão", "Recomendação", "Total Linhas", "Total Falhas (m)",
         "Área Falhas (ha)", "Linhas Viáveis", "% Viáveis",
+        "Custo Op. (R$)", "Custo Reforma (R$)",
         "Lucro Estimado (R$)", "IOI Médio (R$/h)",
         "Eficiência Média (%)", "Rendimento (ha/h)",
     ]
@@ -747,8 +789,8 @@ def render_por_talhao(
     reformas = resumo["Recomendação"].str.contains("REFORMA").sum() if "Recomendação" in resumo.columns else 0
     if reformas > 0:
         st.warning(
-            f"**{reformas} talhão(ões) com falha média ≥ {reforma_threshold_pct:.0f}%** "
-            "— avalie reforma total antes de replantar."
+            f"**{reformas} talhão(ões)**: custo operacional do Kairos ≥ {limite_custo_reforma_pct:.0f}% "
+            f"do custo de reforma (R$ {custo_reforma_ha:,.0f}/ha) — avalie reforma total."
         )
 
     st.dataframe(
@@ -760,6 +802,8 @@ def render_por_talhao(
             "IOI Médio (R$/h)":    "R$ {:,.0f}",
             "Eficiência Média (%)":"{:.1f}%",
             "Rendimento (ha/h)":   "{:.3f}",
+            "Custo Op. (R$)":      "R$ {:,.2f}",
+            "Custo Reforma (R$)":  "R$ {:,.2f}",
         }, na_rep="—"),
         use_container_width=True,
     )
@@ -942,7 +986,7 @@ Linhas com **IOI ≥ IOI mínimo** são exportadas para o piloto automático.
         )
 
     # ── Métricas ──────────────────────────────────────────────────────────
-    render_metrics(gdf_linhas_eco, gdf_gis, params["espacamento"])
+    render_metrics(gdf_linhas_eco, gdf_gis, params["espacamento"], custo_h=custo_h, params=params)
     st.divider()
 
     # ── Tabs ──────────────────────────────────────────────────────────────
@@ -961,7 +1005,12 @@ Linhas com **IOI ≥ IOI mínimo** são exportadas para o piloto automático.
         render_ranking(gdf_linhas_eco, ioi_minimo=params["ioi_minimo"])
 
     with tab_talhao:
-        render_por_talhao(gdf_linhas_eco, gdf_gis, params["espacamento"], params["reforma_threshold_pct"])
+        render_por_talhao(
+            gdf_linhas_eco, gdf_gis, params["espacamento"],
+            gdf_contorno=st.session_state.get("gdf_contorno"),
+            custo_reforma_ha=params["custo_reforma_ha"],
+            limite_custo_reforma_pct=params["limite_custo_reforma_pct"],
+        )
 
     with tab_linhas:
         render_linhas_detalhe(gdf_linhas_eco)
