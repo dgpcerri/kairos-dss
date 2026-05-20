@@ -16,7 +16,14 @@ import streamlit as st
 def limpar(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     gdf = gdf[gdf.geometry.notnull()].copy()
     gdf = gdf[~gdf.geometry.is_empty].copy()
+    # Attempt to repair invalid geometries before discarding them
+    mask_invalid = ~gdf.is_valid
+    if mask_invalid.any():
+        gdf.loc[mask_invalid, "geometry"] = (
+            gdf.loc[mask_invalid, "geometry"].buffer(0)
+        )
     gdf = gdf[gdf.is_valid].copy()
+    gdf = gdf[~gdf.geometry.is_empty].copy()
     return gdf
 
 
@@ -131,6 +138,17 @@ def validar_entradas(
             "O buffer em metros requer um CRS projetado, como SIRGAS 2000 UTM. "
             "Reprojecte os shapefiles antes de fazer upload."
         )
+    # Validate that linear unit is metres (catches exotic projected CRS in degrees)
+    if crs and not crs.is_geographic:
+        try:
+            unit = crs.axis_info[0].unit_name.lower()
+            if unit not in ("metre", "meter"):
+                raise ValueError(
+                    f"Unidade linear do CRS é '{unit}', esperado 'metre'. "
+                    "Use um CRS projetado em metros (ex: SIRGAS 2000 UTM)."
+                )
+        except (IndexError, AttributeError):
+            pass
 
 
 # ---------------------------------------------------------------------------
