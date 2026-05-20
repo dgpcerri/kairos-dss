@@ -719,6 +719,11 @@ def render_por_talhao(
         .reset_index()
     )
 
+    resumo_total["TALHAO"]   = resumo_total["TALHAO"].astype(str)
+    resumo_viaveis["TALHAO"] = resumo_viaveis["TALHAO"].astype(str)
+    area_talhao["TALHAO"]    = area_talhao["TALHAO"].astype(str)
+    rend_talhao["TALHAO"]    = rend_talhao["TALHAO"].astype(str) if len(rend_talhao) > 0 else rend_talhao
+
     resumo = resumo_total.merge(resumo_viaveis, on="TALHAO", how="left").fillna(0)
     resumo = resumo.merge(area_talhao[["TALHAO", "Area_Falhas_ha"]], on="TALHAO", how="left").fillna(0)
     resumo = resumo.merge(rend_talhao[["TALHAO", "Rendimento_ha_h"]], on="TALHAO", how="left").fillna(0)
@@ -737,11 +742,14 @@ def render_por_talhao(
     resumo = resumo.merge(custo_op, on="TALHAO", how="left").fillna(0)
 
     # Área do talhão em ha — vem do contorno dissolvido
+    # Cast TALHAO to str everywhere to avoid int32/str merge conflict
+    resumo["TALHAO"] = resumo["TALHAO"].astype(str)
     if gdf_contorno is not None and len(gdf_contorno) > 0:
         campo_t = [c for c in gdf_contorno.columns if c != "geometry"][0]
         area_geo = gdf_contorno[[campo_t, "geometry"]].copy()
         area_geo["_area_ha"] = area_geo.geometry.area / 10_000
         area_geo = area_geo.rename(columns={campo_t: "TALHAO"})
+        area_geo["TALHAO"] = area_geo["TALHAO"].astype(str)
         resumo = resumo.merge(area_geo[["TALHAO", "_area_ha"]], on="TALHAO", how="left").fillna(0)
     else:
         resumo["_area_ha"] = 0.0
