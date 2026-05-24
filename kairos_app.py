@@ -192,6 +192,24 @@ def render_sidebar() -> dict:
             help="Linhas com IOI abaixo deste valor são marcadas como inviáveis. "
                  "Use 0 para aceitar qualquer IOI positivo.",
         )
+        comprimento_minimo_linha = st.number_input(
+            "Comprimento Mínimo de Linha (m)",
+            value=80.0, min_value=0.0, step=10.0, format="%.0f",
+            help="Linhas mais curtas que este limite são automaticamente excluídas "
+                 "(razão manobra/m plantado proibitiva). Aparecem em cinza tracejado "
+                 "no mapa para inspeção visual.",
+        )
+
+    # ── Cenário Econômico ─────────────────────────────────────────────────
+    with st.sidebar.expander("🎲 Cenário Econômico", expanded=False):
+        cenario_economico = st.radio(
+            "Cenário",
+            options=["Otimista", "Realista", "Pessimista"],
+            index=1,
+            help="Otimista: +15% ATR, −15% diesel, +10% pegamento. "
+                 "Pessimista: −15% ATR, +15% diesel, −15% pegamento.",
+            horizontal=True,
+        )
 
     # ── Custos por hora ───────────────────────────────────────────────────
     with st.sidebar.expander("💰 Custos por Hora (Máquina)", expanded=False):
@@ -200,9 +218,16 @@ def render_sidebar() -> dict:
         salario_operador  = st.number_input("Salário do operador (R$/mês)",       value=3500.0,  min_value=0.0,  step=100.0,  format="%.2f")
         n_auxiliares      = st.number_input("Número de auxiliares",               value=1,       min_value=0,    step=1)
         salario_auxiliar  = st.number_input("Salário por auxiliar (R$/mês)",      value=2500.0,  min_value=0.0,  step=100.0,  format="%.2f")
-        manutencao_mensal = st.number_input("Manutenção fixa mensal (R$/mês)",    value=800.0,   min_value=0.0,  step=50.0,   format="%.2f")
-        depreciacao_anual = st.number_input("Depreciação anual (R$/ano)",         value=36000.0, min_value=0.0,  step=1000.0, format="%.2f")
-        horas_mes         = st.number_input("Horas trabalhadas por mês (h/mês)",  value=176.0,   min_value=1.0,  step=8.0,    format="%.0f")
+        manutencao_mensal = st.number_input("Manutenção fixa mensal (R$/mês)",    value=800.0,    min_value=0.0,  step=50.0,    format="%.2f")
+        depreciacao_anual = st.number_input("Depreciação anual (R$/ano)",         value=100000.0, min_value=0.0,  step=5000.0,  format="%.2f",
+            help="Plantadora nova em uso severo: 80–120 k/ano. Calcule (preço − residual) ÷ vida útil.")
+        horas_mes         = st.number_input("Horas trabalhadas por mês (h/mês)",  value=176.0,    min_value=1.0,  step=8.0,     format="%.0f")
+        fator_encargos_trabalhistas = st.slider(
+            "Fator de Encargos Trabalhistas",
+            min_value=1.30, max_value=1.60, value=1.45, step=0.01, format="%.2f",
+            help="Multiplicador sobre salário bruto para refletir INSS patronal (20%), "
+                 "FGTS (8%), 13º, férias e adicionais. Padrão 1.45 = 45% de encargos.",
+        )
 
     # ── Velocidade & Eficiência ───────────────────────────────────────────
     with st.sidebar.expander("⚡ Velocidade & Eficiência", expanded=False):
@@ -296,6 +321,21 @@ def render_sidebar() -> dict:
             help="Percentual de redução da receita por risco de janela climática.",
         )
 
+    # ── Análise Financeira (VPL) ──────────────────────────────────────────
+    with st.sidebar.expander("📈 Análise Financeira (VPL)", expanded=False):
+        wacc_pct = st.number_input(
+            "Taxa de Desconto / WACC (% a.a.)",
+            value=12.0, min_value=0.0, max_value=40.0, step=0.5, format="%.1f",
+            help="Custo médio ponderado de capital — usado para descontar fluxos "
+                 "futuros no cálculo do VPL. Usinas típicas: 10–15% a.a.",
+        )
+        anos_extensao_replantio = st.slider(
+            "Anos de Extensão pelo Replantio",
+            min_value=1.0, max_value=3.0, value=1.5, step=0.5, format="%.1f",
+            help="Quantas safras adicionais o replantio do Kairos preserva nas "
+                 "linhas replantadas. Tipicamente 1–2 cortes.",
+        )
+
     # ── Exportação ────────────────────────────────────────────────────────
     with st.sidebar.expander("📁 Exportação", expanded=True):
         pasta_saida = st.text_input(
@@ -310,10 +350,13 @@ def render_sidebar() -> dict:
         buffer_falha=buffer_falha, min_falha=min_falha, espacamento=espacamento,
         perc_falha_minimo=perc_falha_minimo,
         ioi_minimo=ioi_minimo,
+        comprimento_minimo_linha=comprimento_minimo_linha,
+        cenario_economico=cenario_economico,
         diesel_lh=diesel_lh, preco_diesel=preco_diesel,
         salario_operador=salario_operador, n_auxiliares=int(n_auxiliares),
         salario_auxiliar=salario_auxiliar, manutencao_mensal=manutencao_mensal,
         depreciacao_anual=depreciacao_anual, horas_mes=horas_mes,
+        fator_encargos_trabalhistas=fator_encargos_trabalhistas,
         velocidade_plantio_kmh=velocidade_plantio_kmh,
         velocidade_deslocamento_kmh=velocidade_deslocamento_kmh,
         tempo_manobra_fixo_min=tempo_manobra_fixo_min,
@@ -330,6 +373,8 @@ def render_sidebar() -> dict:
         custo_reforma_ha=custo_reforma_ha,
         limite_custo_reforma_pct=limite_custo_reforma_pct,
         risco_climatico=risco_climatico,
+        wacc_pct=wacc_pct,
+        anos_extensao_replantio=anos_extensao_replantio,
         pasta_saida=pasta_saida.strip(),
     )
 
@@ -412,6 +457,25 @@ def render_metrics(
             help="Margem por ha de falha negativa — operação sempre no prejuízo com os parâmetros atuais.",
         )
 
+    # ── Lucro Cessante e linhas curtas ───────────────────────────────────
+    lucro_cessante_total = float(gdf_linhas_eco.get("lucro_cessante", pd.Series([0.0])).sum())
+    n_curtas = int(gdf_linhas_eco.get("excluida_curta", pd.Series([False])).sum())
+
+    row2[3].metric(
+        "Lucro Cessante",
+        f"R$ {lucro_cessante_total:,.2f}",
+        help="Receita líquida perdida nas linhas NÃO replantadas (inviáveis + curtas), "
+             "projetada para os anos de extensão configurados. "
+             "Quanto mais alto, maior o custo de oportunidade de deixar essas linhas "
+             "sem replantio até a próxima reforma.",
+    )
+    row2[4].metric(
+        "Linhas Curtas Excluídas",
+        f"{n_curtas}",
+        help="Linhas mais curtas que o comprimento mínimo configurado — "
+             "razão manobra/m plantado proibitiva. Aparecem em cinza tracejado no mapa.",
+    )
+
 
 def _legenda_html() -> str:
     # Section 1 — class % colors
@@ -440,6 +504,10 @@ def _legenda_html() -> str:
         + "<hr style='margin:5px 0;border:none;border-top:1px solid #ddd'/>"
         "<b style='font-size:11px;display:block;margin-bottom:3px'>IOI — Linhas Viáveis (Camada 2)</b>"
         + itens_ioi
+        + "<hr style='margin:5px 0;border:none;border-top:1px solid #ddd'/>"
+        '<div style="display:flex;align-items:center;gap:6px;margin:2px 0">'
+        '<span style="display:inline-block;width:22px;height:0;border-top:2px dashed #777"></span>'
+        '<span style="font-size:10px">Curta (excluída)</span></div>'
         + "</div>"
     )
 
@@ -476,6 +544,18 @@ def render_map(
         viaveis_4326["_ef_fmt"]    = viaveis_4326["eficiencia_pct"].round(1).astype(str) + "%"
         viaveis_4326["_falha_fmt"] = viaveis_4326["perc_falhas"].round(1).astype(str) + "%"
         viaveis_4326["_lucro_fmt"] = "R$ " + viaveis_4326["lucro"].round(2).astype(str)
+
+    # ── Layer 3: excluded short rows (grey/dashed) ────────────────────────
+    curtas_4326 = None
+    if "excluida_curta" in gdf_linhas_eco.columns:
+        curtas = gdf_linhas_eco[gdf_linhas_eco["excluida_curta"] == True].copy()
+        if len(curtas) > 0:
+            curtas_4326 = _to4326(
+                curtas[["geometry", "TALHAO", "FID", "comp_linha",
+                         "perc_falhas", "classe"]].copy()
+            )
+            curtas_4326["_comp_fmt"]  = curtas_4326["comp_linha"].round(1).astype(str) + " m"
+            curtas_4326["_perc_fmt"]  = curtas_4326["perc_falhas"].round(1).astype(str) + "%"
 
     bounds = todas.total_bounds
     center = [(bounds[1] + bounds[3]) / 2, (bounds[0] + bounds[2]) / 2]
@@ -529,6 +609,25 @@ def render_map(
                 sticky=True,
             ),
             show=False,
+        ).add_to(m)
+
+    # ── Layer 3: excluded short rows ──────────────────────────────────────
+    if curtas_4326 is not None and len(curtas_4326) > 0:
+        folium.GeoJson(
+            curtas_4326.to_json(),
+            name="Linhas Curtas Excluídas",
+            style_function=lambda _: {
+                "color":     "#777777",
+                "weight":    2,
+                "opacity":   0.85,
+                "dashArray": "4 4",
+            },
+            tooltip=folium.GeoJsonTooltip(
+                fields=["TALHAO", "FID", "_comp_fmt", "_perc_fmt", "classe"],
+                aliases=["Talhão:", "FID:", "Comprimento:", "% Falha:", "Classe:"],
+                sticky=True,
+            ),
+            show=True,
         ).add_to(m)
 
     folium.LayerControl(collapsed=False).add_to(m)
@@ -817,6 +916,81 @@ def render_por_talhao(
     )
 
 
+def render_vpl(
+    gdf_linhas_eco: gpd.GeoDataFrame,
+    gdf_contorno: gpd.GeoDataFrame | None,
+    params: dict,
+) -> None:
+    st.subheader("📈 VPL 5 anos — Replantio vs Reforma Total")
+    st.caption(
+        f"Cenário: **{params.get('cenario_economico','Realista')}** | "
+        f"WACC: **{params.get('wacc_pct',12.0):.1f}% a.a.** | "
+        f"Extensão pelo replantio: **{params.get('anos_extensao_replantio',1.5):.1f} anos** | "
+        f"Soca atual: **{params.get('ciclo_soca','Cana-planta')}**"
+    )
+
+    if gdf_contorno is None or len(gdf_contorno) == 0:
+        st.warning("Contorno indisponível — VPL por talhão requer geometria do contorno.")
+        return
+
+    df_vpl = eco.calcular_vpl_por_talhao(gdf_linhas_eco, gdf_contorno, params)
+    if len(df_vpl) == 0:
+        st.info("Nenhum talhão para analisar.")
+        return
+
+    # ── Resumo agregado ──────────────────────────────────────────────────
+    vpl_ref_total = df_vpl["vpl_reforma"].sum()
+    vpl_rep_total = df_vpl["vpl_replantio"].sum()
+    n_reforma  = int(df_vpl["decisao_vpl"].str.contains("REFORMA").sum())
+    n_replant  = int(df_vpl["decisao_vpl"].str.contains("REPLANTIO").sum())
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("VPL Reforma (Σ)",   f"R$ {vpl_ref_total:,.0f}")
+    col2.metric("VPL Replantio (Σ)", f"R$ {vpl_rep_total:,.0f}",
+                delta=f"R$ {vpl_rep_total - vpl_ref_total:,.0f} vs reforma")
+    col3.metric("Talhões → Reforma",   f"{n_reforma}")
+    col4.metric("Talhões → Replantio", f"{n_replant}")
+
+    st.markdown(
+        "<small><b>Premissas:</b> Reforma = CAPEX no ano 0 + 5 cortes "
+        "(Cana-planta → Soca 4+). Replantio = custo operacional no ano 0 + "
+        "receita líquida distribuída pelos anos de extensão, decaindo conforme "
+        "a soca. Ambos descontados pela WACC.</small>",
+        unsafe_allow_html=True,
+    )
+    st.divider()
+
+    # ── Tabela detalhada ─────────────────────────────────────────────────
+    df_show = df_vpl.rename(columns={
+        "TALHAO":        "Talhão",
+        "area_ha":       "Área (ha)",
+        "vpl_reforma":   "VPL Reforma (R$)",
+        "vpl_replantio": "VPL Replantio (R$)",
+        "decisao_vpl":   "Decisão VPL",
+        "payback_anos":  "Payback (anos)",
+    })
+
+    def _cor_decisao(row):
+        d = str(row.get("Decisão VPL", ""))
+        if "REPLANTIO" in d:
+            bg = "#e8f5e9"
+        elif "REFORMA" in d:
+            bg = "#fff3e0"
+        else:
+            bg = "#fce4e4"
+        return [f"background-color:{bg}"] * len(row)
+
+    st.dataframe(
+        df_show.style.apply(_cor_decisao, axis=1).format({
+            "Área (ha)":           "{:.2f}",
+            "VPL Reforma (R$)":    "R$ {:,.0f}",
+            "VPL Replantio (R$)":  "R$ {:,.0f}",
+            "Payback (anos)":      "{:.1f}",
+        }, na_rep="—"),
+        use_container_width=True,
+    )
+
+
 def render_linhas_detalhe(gdf_linhas_eco: gpd.GeoDataFrame) -> None:
     st.subheader("📋 Detalhamento por Linha")
 
@@ -998,10 +1172,11 @@ Linhas com **IOI ≥ IOI mínimo** são exportadas para o piloto automático.
     st.divider()
 
     # ── Tabs ──────────────────────────────────────────────────────────────
-    tab_mapa, tab_rank, tab_talhao, tab_linhas = st.tabs([
+    tab_mapa, tab_rank, tab_talhao, tab_vpl, tab_linhas = st.tabs([
         "🗺️ Mapa",
         "🏆 Ranking de Linhas",
         "📊 Por Talhão",
+        "📈 VPL 5 anos",
         "📋 Linhas",
     ])
 
@@ -1019,6 +1194,9 @@ Linhas com **IOI ≥ IOI mínimo** são exportadas para o piloto automático.
             custo_reforma_ha=params["custo_reforma_ha"],
             limite_custo_reforma_pct=params["limite_custo_reforma_pct"],
         )
+
+    with tab_vpl:
+        render_vpl(gdf_linhas_eco, st.session_state.get("gdf_contorno"), params)
 
     with tab_linhas:
         render_linhas_detalhe(gdf_linhas_eco)
