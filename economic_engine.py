@@ -240,7 +240,8 @@ def calcular_vpl_talhao(
     custo_op_replantio: float,
     receita_liquida_replantio: float,
     custo_reforma_ha: float,
-    ganho_esperado_tha: float,
+    produtividade_reforma_tha: float,   # produtividade PLENA do talhão reformado (t/ha)
+    ganho_esperado_tha: float,          # ganho incremental por ha de FALHA (Replantio Pontual)
     preco_efetivo_ton: float,
     pegamento_pct: float,
     risco_climatico_pct: float,
@@ -251,13 +252,15 @@ def calcular_vpl_talhao(
     """Compara VPL da Reforma Total vs VPL do Replantio Pontual (5 anos).
 
     Premissas:
-        * Reforma Total: CAPEX no ano 0; receita do ciclo completo (Cana-planta
-          até Soca 4+, 5 cortes anuais) com decaimento conforme FATOR_SOCA.
+        * Reforma Total: CAPEX no ano 0; receita calculada sobre TODA a área
+          do talhão usando `produtividade_reforma_tha` (produtividade plena
+          do talhão após reforma — distinto do ganho incremental do Kairos).
+          5 cortes com decaimento conforme FATOR_SOCA a partir de Cana-planta.
         * Replantio Pontual: CUSTO_OP no ano 0; receita_liquida_replantio
           (extra das falhas replantadas) distribuída pelos próximos
           `anos_extensao_replantio` cortes, mantendo a soca atual e
           decaindo conforme FATOR_SOCA.
-        * Receita por hectare = ganho × pegamento × preço × (1 − risco).
+        * Receita por hectare (reforma) = produtiv_reforma × pegamento × preço × (1 − risco).
         * Os anos da safra são tratados como anuais (1 corte = 1 ano).
 
     Returns:
@@ -266,13 +269,16 @@ def calcular_vpl_talhao(
     wacc = max(wacc_pct / 100.0, 0.0)
     peg  = pegamento_pct / 100.0
     risc = 1.0 - risco_climatico_pct / 100.0
-    receita_base_ha = ganho_esperado_tha * peg * preco_efetivo_ton * risc
 
-    # ── Reforma: 5 cortes começando em Cana-planta ─────────────────────
+    # ── Reforma: receita baseada na produtividade PLENA do talhão ──────
+    # Usa produtividade_reforma_tha (ex: 90 t/ha), não o ganho incremental
+    # do Kairos (ganho_esperado_tha = toneladas por ha de FALHA).
+    receita_reforma_base_ha = produtividade_reforma_tha * peg * preco_efetivo_ton * risc
+
     fluxos_reforma: list[float] = [-area_ha * custo_reforma_ha]
     for ciclo in CICLO_ORDEM:
         fator = FATOR_SOCA[ciclo]
-        receita_ano = area_ha * receita_base_ha * fator
+        receita_ano = area_ha * receita_reforma_base_ha * fator
         fluxos_reforma.append(receita_ano)
     vpl_reforma = _vpl(fluxos_reforma, wacc)
 
@@ -368,6 +374,7 @@ def calcular_vpl_por_talhao(
             custo_op_replantio         = row["custo_op"],
             receita_liquida_replantio  = row["receita_liq"],
             custo_reforma_ha           = float(params.get("custo_reforma_ha", 14000.0)),
+            produtividade_reforma_tha  = float(params.get("produtividade_reforma_tha", 90.0)),
             ganho_esperado_tha         = params["ganho_esperado_tha"],
             preco_efetivo_ton          = preco_efetivo_ton,
             pegamento_pct              = pegamento_eff,

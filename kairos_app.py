@@ -335,6 +335,14 @@ def render_sidebar() -> dict:
             help="Quantas safras adicionais o replantio do Kairos preserva nas "
                  "linhas replantadas. Tipicamente 1–2 cortes.",
         )
+        produtividade_reforma_tha = st.number_input(
+            "Produtividade do Talhão Reformado (t/ha)",
+            value=90.0, min_value=10.0, max_value=200.0, step=5.0, format="%.1f",
+            help="Produtividade PLENA do talhão após Reforma Total (toda a área, "
+                 "Cana-planta). Diferente do 'Ganho Esperado' do Kairos, que é o "
+                 "ganho incremental por ha de FALHA replantada. "
+                 "Recomendado: 70–120 t/ha (consulte histórico da variedade).",
+        )
 
     # ── Exportação ────────────────────────────────────────────────────────
     with st.sidebar.expander("📁 Exportação", expanded=True):
@@ -375,6 +383,7 @@ def render_sidebar() -> dict:
         risco_climatico=risco_climatico,
         wacc_pct=wacc_pct,
         anos_extensao_replantio=anos_extensao_replantio,
+        produtividade_reforma_tha=produtividade_reforma_tha,
         pasta_saida=pasta_saida.strip(),
     )
 
