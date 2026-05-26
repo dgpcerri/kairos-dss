@@ -524,21 +524,29 @@ def render_map(
         return gdf
 
     # ── Layer 1: all lines colored by gap class ───────────────────────────
-    todas = _to4326(
-        gdf_gis[["geometry", "classe", "TALHAO", "comp_linha", "perc_falhas"]].copy()
-    )
+    _gdf1 = gdf_gis[["geometry", "classe", "TALHAO", "comp_linha", "perc_falhas"]].copy()
+    # Sanitize: replace inf/-inf with NaN so to_json() produces valid JSON
+    _gdf1["perc_falhas"] = _gdf1["perc_falhas"].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    _gdf1["comp_linha"]  = _gdf1["comp_linha"].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    todas = _to4326(_gdf1)
     todas["_perc_fmt"] = todas["perc_falhas"].round(1).astype(str) + "%"
     todas["_color"]    = todas["classe"].map(CLASSE_CORES).fillna("#808080")
+
+    if todas.empty:
+        st.warning("Nenhuma linha encontrada para exibir no mapa. Verifique os arquivos enviados.")
+        return
 
     # ── Layer 2: viable lines colored by IOI tier ─────────────────────────
     viaveis = gdf_linhas_eco[gdf_linhas_eco["viavel"] == True].copy()
     viaveis_4326 = None
     if len(viaveis) > 0:
-        viaveis_4326 = _to4326(
-            viaveis[["geometry", "TALHAO", "FID", "classe",
-                      "soma_falhas", "perc_falhas", "ioi",
-                      "eficiencia_pct", "lucro", "ranking"]].copy()
-        )
+        _gdf2 = viaveis[["geometry", "TALHAO", "FID", "classe",
+                          "soma_falhas", "perc_falhas", "ioi",
+                          "eficiencia_pct", "lucro", "ranking"]].copy()
+        # Sanitize numeric columns — replace inf/-inf with finite values for JSON
+        for _col in ["ioi", "lucro", "eficiencia_pct", "perc_falhas", "soma_falhas"]:
+            _gdf2[_col] = _gdf2[_col].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        viaveis_4326 = _to4326(_gdf2)
         viaveis_4326["_color"]     = viaveis_4326["ioi"].apply(_ioi_cor)
         viaveis_4326["_ioi_fmt"]   = "R$ " + viaveis_4326["ioi"].round(0).astype(int).astype(str) + "/h"
         viaveis_4326["_ef_fmt"]    = viaveis_4326["eficiencia_pct"].round(1).astype(str) + "%"
@@ -550,12 +558,17 @@ def render_map(
     if "excluida_curta" in gdf_linhas_eco.columns:
         curtas = gdf_linhas_eco[gdf_linhas_eco["excluida_curta"] == True].copy()
         if len(curtas) > 0:
-            curtas_4326 = _to4326(
-                curtas[["geometry", "TALHAO", "FID", "comp_linha",
-                         "perc_falhas", "classe"]].copy()
-            )
-            curtas_4326["_comp_fmt"]  = curtas_4326["comp_linha"].round(1).astype(str) + " m"
-            curtas_4326["_perc_fmt"]  = curtas_4326["perc_falhas"].round(1).astype(str) + "%"
+            _cols3 = [c for c in ["geometry", "TALHAO", "FID", "comp_linha",
+                                   "perc_falhas", "classe"] if c in curtas.columns]
+            _gdf3 = curtas[_cols3].copy()
+            for _col in ["comp_linha", "perc_falhas"]:
+                if _col in _gdf3.columns:
+                    _gdf3[_col] = _gdf3[_col].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+            curtas_4326 = _to4326(_gdf3)
+            curtas_4326["_comp_fmt"]  = curtas_4326.get("comp_linha",
+                pd.Series(["0"] * len(curtas_4326))).round(1).astype(str) + " m"
+            curtas_4326["_perc_fmt"]  = curtas_4326.get("perc_falhas",
+                pd.Series(["0"] * len(curtas_4326))).round(1).astype(str) + "%"
 
     bounds = todas.total_bounds
     center = [(bounds[1] + bounds[3]) / 2, (bounds[0] + bounds[2]) / 2]
@@ -613,6 +626,13 @@ def render_map(
 
     # ── Layer 3: excluded short rows ──────────────────────────────────────
     if curtas_4326 is not None and len(curtas_4326) > 0:
+        # Only include tooltip fields that actually exist in the dataframe
+        _tip3_fields   = [f for f in ["TALHAO", "FID", "_comp_fmt", "_perc_fmt", "classe"]
+                          if f in curtas_4326.columns]
+        _tip3_aliases  = {
+            "TALHAO": "Talhão:", "FID": "FID:",
+            "_comp_fmt": "Comprimento:", "_perc_fmt": "% Falha:", "classe": "Classe:",
+        }
         folium.GeoJson(
             curtas_4326.to_json(),
             name="Linhas Curtas Excluídas",
@@ -623,10 +643,10 @@ def render_map(
                 "dashArray": "4 4",
             },
             tooltip=folium.GeoJsonTooltip(
-                fields=["TALHAO", "FID", "_comp_fmt", "_perc_fmt", "classe"],
-                aliases=["Talhão:", "FID:", "Comprimento:", "% Falha:", "Classe:"],
+                fields=_tip3_fields,
+                aliases=[_tip3_aliases[f] for f in _tip3_fields],
                 sticky=True,
-            ),
+            ) if _tip3_fields else None,
             show=True,
         ).add_to(m)
 
@@ -1181,8 +1201,12 @@ Linhas com **IOI ≥ IOI mínimo** são exportadas para o piloto automático.
     ])
 
     with tab_mapa:
-        render_map(gdf_gis, gdf_linhas_eco,
-                   gdf_contorno=st.session_state.get("gdf_contorno"))
+        try:
+            render_map(gdf_gis, gdf_linhas_eco,
+                       gdf_contorno=st.session_state.get("gdf_contorno"))
+        except Exception as _map_exc:
+            st.error(f"Erro ao renderizar o mapa: {_map_exc}")
+            st.exception(_map_exc)
 
     with tab_rank:
         render_ranking(gdf_linhas_eco, ioi_minimo=params["ioi_minimo"])
