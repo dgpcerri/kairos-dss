@@ -1055,6 +1055,204 @@ def render_linhas_detalhe(gdf_linhas_eco: gpd.GeoDataFrame) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Logística de Percurso
+# ---------------------------------------------------------------------------
+
+def render_percurso(
+    gdf_linhas_eco: gpd.GeoDataFrame,
+    gdf_contorno: gpd.GeoDataFrame | None = None,
+) -> None:
+    """Aba Logística de Percurso — mapa interativo do percurso real do trator."""
+    import math
+    from folium.plugins import AntPath
+
+    st.subheader("🚜 Logística de Percurso — Simulação do Trajeto")
+
+    # ── somente viáveis ─────────────────────────────────────────────────────
+    viaveis = gdf_linhas_eco[gdf_linhas_eco["viavel"] == True].copy()
+    if viaveis.empty:
+        st.warning(
+            "Nenhuma linha viável disponível para simular o percurso. "
+            "Ajuste os parâmetros na barra lateral."
+        )
+        return
+
+    # ── seleção de talhão ──────────────────────────────────────────────────
+    talhoes = sorted(viaveis["TALHAO"].dropna().astype(str).unique())
+    col_sel, _ = st.columns([2, 3])
+    with col_sel:
+        talhao_sel = st.selectbox("Talhão:", talhoes, key="percurso_talhao")
+
+    linhas_t = viaveis[viaveis["TALHAO"].astype(str) == talhao_sel].copy()
+    if linhas_t.empty:
+        st.warning(f"Nenhuma linha viável no talhão **{talhao_sel}**.")
+        return
+
+    # ── helpers de geometria ───────────────────────────────────────────────
+    def _coords(geom):
+        """Retorna lista de (x, y) do geom; usa sub-geom mais longa se multi."""
+        if geom.geom_type == "LineString":
+            return list(geom.coords)
+        if geom.geom_type == "MultiLineString":
+            return list(max(geom.geoms, key=lambda g: g.length).coords)
+        return []
+
+    def _bearing(coords):
+        """Ângulo azimutal 0–180° entre o primeiro e último ponto."""
+        if len(coords) < 2:
+            return 0.0
+        dx = coords[-1][0] - coords[0][0]
+        dy = coords[-1][1] - coords[0][1]
+        return math.degrees(math.atan2(dx, dy)) % 180.0
+
+    # ── ordenar linhas perpendicular à direção dominante ───────────────────
+    raw_c     = [_coords(g) for g in linhas_t.geometry]
+    med_bear  = float(np.median([_bearing(c) for c in raw_c if c])) if raw_c else 0.0
+    perp_rad  = math.radians((med_bear + 90.0) % 180.0)
+    linhas_t["_sk"] = linhas_t.geometry.apply(
+        lambda g: g.centroid.x * math.cos(perp_rad) + g.centroid.y * math.sin(perp_rad)
+    )
+    linhas_t = linhas_t.sort_values("_sk").reset_index(drop=True)
+
+    # ── reprojeção única para WGS84 ────────────────────────────────────────
+    lt4326 = (
+        linhas_t.to_crs(4326)
+        if linhas_t.crs and linhas_t.crs.to_epsg() != 4326
+        else linhas_t
+    )
+
+    # ── percurso serpentino (linhas alternadas de direção) ─────────────────
+    path_data: list[dict] = []
+    for i, geom_wgs in enumerate(lt4326.geometry):
+        pts = _coords(geom_wgs)           # WGS84 → (lon, lat) pairs
+        if len(pts) < 2:
+            continue
+        latlon = [[c[1], c[0]] for c in pts]   # Folium usa [lat, lon]
+        if i % 2 == 1:
+            latlon = latlon[::-1]               # retorno: inverte sentido
+        row_s = linhas_t.iloc[i]
+        path_data.append({
+            "latlon": latlon,
+            "fid":    row_s.get("FID", i + 1),
+            "comp":   float(row_s.get("comp_linha") or 0),
+            "ioi":    float(row_s.get("ioi") or 0),
+        })
+
+    if not path_data:
+        st.warning("Não foi possível extrair coordenadas das linhas para este talhão.")
+        return
+
+    # conexões de cabeceira: fim da linha i → início da linha i+1
+    turns = [
+        [path_data[i]["latlon"][-1], path_data[i + 1]["latlon"][0]]
+        for i in range(len(path_data) - 1)
+    ]
+
+    # ── mapa Folium ────────────────────────────────────────────────────────
+    all_lats = [p[0] for r in path_data for p in r["latlon"]]
+    all_lons = [p[1] for r in path_data for p in r["latlon"]]
+    center   = [np.mean(all_lats), np.mean(all_lons)]
+
+    m = folium.Map(location=center, zoom_start=16, tiles="CartoDB positron")
+
+    # contorno do talhão selecionado
+    if gdf_contorno is not None and len(gdf_contorno) > 0:
+        _campo = [c for c in gdf_contorno.columns if c != "geometry"][0]
+        _t_geom = gdf_contorno[gdf_contorno[_campo].astype(str) == talhao_sel]
+        if len(_t_geom) > 0:
+            folium.GeoJson(
+                _t_geom.to_crs(4326)[["geometry"]].to_json(),
+                style_function=lambda _: {
+                    "fillColor": "#a5d6a7", "fillOpacity": 0.14,
+                    "color": "#2e7d32", "weight": 2.5, "dashArray": "6 3",
+                },
+                name="Contorno do talhão",
+            ).add_to(m)
+
+    # Layer 1 — linhas de plantio (AntPath animado, azul)
+    fg_plant = folium.FeatureGroup(name="Linhas de plantio", show=True)
+    for idx, pd_ in enumerate(path_data):
+        AntPath(
+            locations=pd_["latlon"],
+            color="#1565C0",
+            weight=4,
+            opacity=0.90,
+            delay=700,
+            dash_array=[12, 24],
+            pulse_color="#90CAF9",
+            tooltip=(
+                f"<b>Linha #{idx + 1}</b><br>"
+                f"FID: {pd_['fid']}<br>"
+                f"Comprimento: {pd_['comp']:.0f} m<br>"
+                f"IOI: R$ {pd_['ioi']:.0f}/h"
+            ),
+        ).add_to(fg_plant)
+    fg_plant.add_to(m)
+
+    # Layer 2 — manobras na cabeceira (tracejado vermelho)
+    fg_turn = folium.FeatureGroup(name="Manobras na cabeceira", show=True)
+    for t in turns:
+        folium.PolyLine(
+            locations=t,
+            color="#C62828",
+            weight=2.5,
+            opacity=0.85,
+            dash_array="8 5",
+            tooltip="Manobra na cabeceira",
+        ).add_to(fg_turn)
+    fg_turn.add_to(m)
+
+    # marcadores de entrada e saída
+    _icon_entrada = folium.DivIcon(
+        html='<div style="font-size:28px;line-height:1;'
+             'filter:drop-shadow(0 1px 3px #0009);">🟢</div>',
+        icon_size=(32, 32), icon_anchor=(16, 16),
+    )
+    _icon_saida = folium.DivIcon(
+        html='<div style="font-size:28px;line-height:1;'
+             'filter:drop-shadow(0 1px 3px #0009);">🔴</div>',
+        icon_size=(32, 32), icon_anchor=(16, 16),
+    )
+    folium.Marker(
+        location=path_data[0]["latlon"][0],
+        tooltip="<b>▶ ENTRADA NO TALHÃO</b><br>Início da primeira linha",
+        icon=_icon_entrada,
+    ).add_to(m)
+    folium.Marker(
+        location=path_data[-1]["latlon"][-1],
+        tooltip="<b>■ SAÍDA DO TALHÃO</b><br>Fim da última linha",
+        icon=_icon_saida,
+    ).add_to(m)
+
+    folium.LayerControl(collapsed=False).add_to(m)
+    st_folium(m, use_container_width=True, height=540, returned_objects=[])
+
+    # ── métricas do percurso ───────────────────────────────────────────────
+    comp_total = sum(r["comp"] for r in path_data)
+    ioi_medio  = float(np.mean([r["ioi"] for r in path_data]))
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Linhas no percurso",    len(path_data))
+    c2.metric("Manobras (cabeceiras)", len(turns))
+    c3.metric("Comprimento total",     f"{comp_total / 1000:.2f} km")
+    c4.metric("IOI médio",             f"R$ {ioi_medio:.0f}/h")
+
+    # ── padrão operacional (colapsável) ────────────────────────────────────
+    with st.expander("📋 Padrão Operacional Obrigatório", expanded=False):
+        st.markdown(
+            "**🟢 Tráfego em Linha Cheia** — Entrar na linha pelo início, percorrer o "
+            "comprimento total de forma contínua e realizar o giro apenas na cabeceira. "
+            "Paradas ou inversões intermediárias geram compactação localizada e prejudicam "
+            "a uniformidade do plantio.\n\n"
+            "**🔴 Proibição de Manobras Centrais** — Vedado cruzar ou cortar linhas no "
+            "interior do talhão. Todas as inversões de sentido devem ocorrer exclusivamente "
+            "nas cabeceiras delimitadas, preservando a estrutura do solo na zona produtiva.\n\n"
+            "**⚡ Eficiência de Percurso** — Manter velocidade e direção constantes durante "
+            "toda a passagem na linha otimiza a consistência do plantio, reduz o tempo de "
+            "ciclo e maximiza o rendimento operacional da plantadora (ha/h)."
+        )
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1236,131 +1434,7 @@ Linhas com **IOI ≥ IOI mínimo** são exportadas para o piloto automático.
         render_linhas_detalhe(gdf_linhas_eco)
 
     with tab_percurso:
-        _DIAGRAMA_HTML = """
-<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:680px;margin:0 auto;padding:8px;
-            background:#FAFAFA;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.10);">
-  <p style="text-align:center;font-weight:700;color:#1B5E20;margin:0 0 10px;font-size:14px;">
-    🚜 Fluxo Operacional — Trator + Plantadora Kairos
-  </p>
-  <!-- ENTRADA -->
-  <div style="padding-left:82px;margin-bottom:2px;">
-    <span style="display:inline-block;background:#1565C0;color:#fff;font-size:10px;
-                 font-weight:700;padding:3px 14px;border-radius:4px 4px 0 0;letter-spacing:1px;">
-      ▼&nbsp;ENTRADA
-    </span>
-  </div>
-  <!-- Field box -->
-  <div style="display:flex;border:2.5px solid #4E342E;border-radius:4px;overflow:hidden;">
-    <!-- Left headland -->
-    <div style="width:80px;background:#D7CCC8;border-right:2px dashed #8D6E63;flex-shrink:0;
-                display:flex;flex-direction:column;align-items:center;justify-content:center;
-                padding:8px 4px;gap:4px;">
-      <span style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:9px;
-                   font-weight:700;color:#3E2723;letter-spacing:2px;">CABECEIRA</span>
-      <span style="font-size:20px;margin-top:6px;">↺</span>
-      <span style="font-size:8.5px;color:#5D4037;text-align:center;line-height:1.4;">
-        giro<br>obrigatório
-      </span>
-    </div>
-    <!-- Rows area -->
-    <div style="flex:1;background:#F1F8E9;display:flex;flex-direction:column;
-                justify-content:space-evenly;padding:10px 8px;gap:8px;
-                position:relative;min-height:190px;">
-      <!-- Row 1: L→R -->
-      <div style="display:flex;align-items:center;background:#C5E1A5;border-radius:3px;
-                  padding:5px 10px;border:1px solid #7CB342;gap:8px;">
-        <span style="font-size:18px;flex-shrink:0;line-height:1;">🚜</span>
-        <div style="flex:1;height:3px;border-radius:2px;
-                    background:repeating-linear-gradient(90deg,#33691E 0,#33691E 8px,transparent 8px,transparent 14px);">
-        </div>
-        <span style="font-size:22px;font-weight:900;color:#1B5E20;flex-shrink:0;line-height:1;">→</span>
-      </div>
-      <!-- Row 2: R→L -->
-      <div style="display:flex;align-items:center;background:#C5E1A5;border-radius:3px;
-                  padding:5px 10px;border:1px solid #7CB342;gap:8px;">
-        <span style="font-size:22px;font-weight:900;color:#1B5E20;flex-shrink:0;line-height:1;">←</span>
-        <div style="flex:1;height:3px;border-radius:2px;
-                    background:repeating-linear-gradient(270deg,#33691E 0,#33691E 8px,transparent 8px,transparent 14px);">
-        </div>
-        <span style="font-size:18px;flex-shrink:0;line-height:1;">🚜</span>
-      </div>
-      <!-- Row 3: L→R -->
-      <div style="display:flex;align-items:center;background:#C5E1A5;border-radius:3px;
-                  padding:5px 10px;border:1px solid #7CB342;gap:8px;">
-        <span style="font-size:18px;flex-shrink:0;line-height:1;">🚜</span>
-        <div style="flex:1;height:3px;border-radius:2px;
-                    background:repeating-linear-gradient(90deg,#33691E 0,#33691E 8px,transparent 8px,transparent 14px);">
-        </div>
-        <span style="font-size:22px;font-weight:900;color:#1B5E20;flex-shrink:0;line-height:1;">→</span>
-      </div>
-      <!-- Prohibition badge (centered, absolute) -->
-      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-                  background:rgba(183,28,28,.90);color:#fff;padding:5px 14px;
-                  border-radius:6px;font-size:10px;font-weight:700;border:2px solid #fff;
-                  white-space:nowrap;pointer-events:none;
-                  box-shadow:0 2px 8px rgba(0,0,0,.30);">
-        🚫&nbsp;SEM MANOBRAS NO CENTRO DO TALHÃO
-      </div>
-    </div>
-    <!-- Right headland -->
-    <div style="width:80px;background:#D7CCC8;border-left:2px dashed #8D6E63;flex-shrink:0;
-                display:flex;flex-direction:column;align-items:center;justify-content:center;
-                padding:8px 4px;gap:4px;">
-      <span style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:9px;
-                   font-weight:700;color:#3E2723;letter-spacing:2px;">CABECEIRA</span>
-      <span style="font-size:20px;margin-top:6px;">↻</span>
-      <span style="font-size:8.5px;color:#5D4037;text-align:center;line-height:1.4;">
-        giro<br>obrigatório
-      </span>
-    </div>
-  </div>
-  <!-- SAÍDA -->
-  <div style="display:flex;justify-content:flex-end;padding-right:82px;margin-top:2px;">
-    <span style="display:inline-block;background:#2E7D32;color:#fff;font-size:10px;
-                 font-weight:700;padding:3px 14px;border-radius:0 0 4px 4px;letter-spacing:1px;">
-      ▲&nbsp;SAÍDA
-    </span>
-  </div>
-</div>"""
-
-        _REGRAS_HTML = """
-<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:680px;margin:14px auto 0;
-            padding:12px 16px;background:#fff;border-radius:8px;
-            border-left:4px solid #2E7D32;box-shadow:0 1px 4px rgba(0,0,0,.08);">
-  <p style="font-weight:700;color:#1B5E20;margin:0 0 10px;font-size:13px;">
-    📋 Padrão Operacional Obrigatório
-  </p>
-  <div style="display:flex;flex-direction:column;gap:10px;">
-    <div style="display:flex;gap:10px;align-items:flex-start;">
-      <span style="font-size:16px;flex-shrink:0;line-height:1.5;">🟢</span>
-      <span style="font-size:12px;color:#212121;line-height:1.6;">
-        <b>Tráfego em Linha Cheia:</b> O trator deve entrar na linha pelo início,
-        percorrer o comprimento total de forma contínua e realizar o giro apenas na
-        cabeceira. Paradas ou inversões intermediárias geram compactação localizada
-        e prejudicam a uniformidade do plantio.
-      </span>
-    </div>
-    <div style="display:flex;gap:10px;align-items:flex-start;">
-      <span style="font-size:16px;flex-shrink:0;line-height:1.5;">🔴</span>
-      <span style="font-size:12px;color:#212121;line-height:1.6;">
-        <b>Proibição de Manobras Centrais:</b> É vedado cruzar ou cortar linhas no
-        interior do talhão. Todas as inversões de sentido devem ocorrer exclusivamente
-        nas cabeceiras delimitadas, preservando a estrutura do solo na zona produtiva.
-      </span>
-    </div>
-    <div style="display:flex;gap:10px;align-items:flex-start;">
-      <span style="font-size:16px;flex-shrink:0;line-height:1.5;">⚡</span>
-      <span style="font-size:12px;color:#212121;line-height:1.6;">
-        <b>Eficiência de Percurso:</b> Manter velocidade e direção constantes durante
-        toda a passagem na linha otimiza a consistência do plantio, reduz o tempo de
-        ciclo e maximiza o rendimento operacional da plantadora (ha/h).
-      </span>
-    </div>
-  </div>
-</div>"""
-
-        st.markdown(_DIAGRAMA_HTML, unsafe_allow_html=True)
-        st.markdown(_REGRAS_HTML,   unsafe_allow_html=True)
+        render_percurso(gdf_linhas_eco, gdf_contorno=st.session_state.get("gdf_contorno"))
 
     st.divider()
 
