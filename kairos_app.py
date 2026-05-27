@@ -1114,20 +1114,10 @@ def render_percurso(
         dy = coords[-1][1] - coords[0][1]
         return math.degrees(math.atan2(dx, dy)) % 180.0
 
-    # ── ordenar linhas perpendicular à direção dominante ───────────────────
-    # bear_rad é o bearing geográfico (ângulo a partir do Norte, sentido horário).
-    # Vetor de direção geográfica: (sin(bear), cos(bear)) em (Leste, Norte).
-    # Perpendicular (90° horário): (cos(bear), -sin(bear)) em (Leste, Norte).
-    # Sort key correto: x·cos(bear) - y·sin(bear)
-    # Exemplos: linhas N-S (0°) → ordena por x (Leste)  ✓
-    #           linhas L-O (90°) → ordena por -y (Norte) ✓
-    raw_c     = [_coords(g) for g in linhas_t.geometry]
-    med_bear  = float(np.median([_bearing(c) for c in raw_c if c])) if raw_c else 0.0
-    bear_rad  = math.radians(med_bear)
-    linhas_t["_sk"] = linhas_t.geometry.apply(
-        lambda g: g.centroid.x * math.cos(bear_rad) - g.centroid.y * math.sin(bear_rad)
-    )
-    linhas_t = linhas_t.sort_values("_sk").reset_index(drop=True)
+    # ── bearing dominante (para direção do U-turn) ───────────────────────────
+    raw_c    = [_coords(g) for g in linhas_t.geometry]
+    med_bear = float(np.median([_bearing(c) for c in raw_c if c])) if raw_c else 0.0
+    bear_rad = math.radians(med_bear)
 
     # ── reprojeção única para WGS84 ────────────────────────────────────────
     lt4326 = (
@@ -1136,26 +1126,86 @@ def render_percurso(
         else linhas_t
     )
 
-    # ── percurso serpentino — armazena coords projetadas E WGS84 ──────────
-    HEADLAND_M = 20.0   # distância do buffer de cabeceira (m)
+    # ── percurso nearest-neighbor — garante linhas adjacentes ─────────────
+    #
+    # Sort por centroide não funciona em talhões irregulares: linhas distantes
+    # ficam consecutivas em path_data e as manobras cruzam o campo inteiro.
+    # Nearest-neighbor: a cada passo escolhe a linha mais próxima do ponto de
+    # saída atual, selecionando também qual ponta usar como entrada (inversion
+    # automática), sem precisar de i % 2.
+    #
+    HEADLAND_M = 20.0
+
+    # Pré-extrai coords projetadas e WGS84 para todas as linhas válidas
+    _all_proj = []
+    _all_wgs  = []
+    _all_meta = []
+    for i in range(len(linhas_t)):
+        pp = _coords(linhas_t.geometry.iloc[i])
+        pw = _coords(lt4326.geometry.iloc[i])
+        if len(pp) < 2:
+            continue
+        rs = linhas_t.iloc[i]
+        _all_proj.append(pp)
+        _all_wgs.append(pw)
+        _all_meta.append({
+            "fid":  rs.get("FID", i + 1),
+            "comp": float(rs.get("comp_linha") or 0),
+            "ioi":  float(rs.get("ioi") or 0),
+        })
 
     path_data: list[dict] = []
-    for i in range(len(linhas_t)):
-        pts_proj = _coords(linhas_t.geometry.iloc[i])
-        pts_wgs  = _coords(lt4326.geometry.iloc[i])
-        if len(pts_proj) < 2:
-            continue
-        if len(path_data) % 2 == 1:   # retorno: inverte sentido (baseado no índice real em path_data)
-            pts_proj = pts_proj[::-1]
-            pts_wgs  = pts_wgs[::-1]
-        row_s = linhas_t.iloc[i]
+    if _all_proj:
+        # Ponto de partida: linha cuja ponta inicial tem menor projeção
+        # perpendicular (equivale ao "canto" do talhão)
+        _cos_b, _sin_b = math.cos(bear_rad), math.sin(bear_rad)
+        def _perp(pt):
+            return pt[0] * _cos_b - pt[1] * _sin_b
+
+        remaining = list(range(len(_all_proj)))
+        # Inicia pelo endpoint global de menor projeção perpendicular
+        best_start, best_val = 0, float('inf')
+        for j in remaining:
+            for pt in (_all_proj[j][0], _all_proj[j][-1]):
+                v = _perp(pt)
+                if v < best_val:
+                    best_val, best_start = v, j
+
+        # Primeira linha: entra pela ponta de menor projeção
+        j0 = best_start
+        remaining.remove(j0)
+        pp, pw = _all_proj[j0], _all_wgs[j0]
+        if _perp(pp[0]) > _perp(pp[-1]):   # ponta[-1] é "menor" → inverte
+            pp, pw = pp[::-1], pw[::-1]
         path_data.append({
-            "proj":   pts_proj,
-            "latlon": [[c[1], c[0]] for c in pts_wgs],
-            "fid":    row_s.get("FID", i + 1),
-            "comp":   float(row_s.get("comp_linha") or 0),
-            "ioi":    float(row_s.get("ioi") or 0),
+            "proj":   pp,
+            "latlon": [[c[1], c[0]] for c in pw],
+            **_all_meta[j0],
         })
+
+        # Loop nearest-neighbor
+        while remaining:
+            curr_exit = path_data[-1]["proj"][-1]
+            best_j, best_inv, best_d = None, False, float('inf')
+            for j in remaining:
+                pts = _all_proj[j]
+                d0 = math.hypot(curr_exit[0]-pts[0][0],  curr_exit[1]-pts[0][1])
+                d1 = math.hypot(curr_exit[0]-pts[-1][0], curr_exit[1]-pts[-1][1])
+                d, inv = (d0, False) if d0 <= d1 else (d1, True)
+                if d < best_d:
+                    best_d, best_j, best_inv = d, j, inv
+            if best_j is None:
+                break
+            remaining.remove(best_j)
+            pp = _all_proj[best_j]
+            pw = _all_wgs[best_j]
+            if best_inv:
+                pp, pw = pp[::-1], pw[::-1]
+            path_data.append({
+                "proj":   pp,
+                "latlon": [[c[1], c[0]] for c in pw],
+                **_all_meta[best_j],
+            })
 
     if not path_data:
         st.warning("Não foi possível extrair coordenadas das linhas para este talhão.")
