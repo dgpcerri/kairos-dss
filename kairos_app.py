@@ -1062,8 +1062,17 @@ def render_percurso(
     gdf_linhas_eco: gpd.GeoDataFrame,
     gdf_contorno: gpd.GeoDataFrame | None = None,
 ) -> None:
-    """Aba Logística de Percurso — mapa interativo do percurso real do trator."""
+    """Aba Logística de Percurso — mapa interativo do percurso real do trator.
+
+    Manobras de cabeceira são sempre roteadas FORA do talhão usando uma
+    trajetória em U no CRS projetado:
+        saída_linha_i  →  extensão HEADLAND_M na direção de viagem
+        →  deslocamento lateral até a entrada da linha i+1
+        →  recuo HEADLAND_M até a entrada_linha_i+1
+    Isso garante que nenhum segmento de manobra cruze o interior do talhão.
+    """
     import math
+    from shapely.geometry import LineString as _LS
     from folium.plugins import AntPath
 
     st.subheader("🚜 Logística de Percurso — Simulação do Trajeto")
@@ -1090,7 +1099,7 @@ def render_percurso(
 
     # ── helpers de geometria ───────────────────────────────────────────────
     def _coords(geom):
-        """Retorna lista de (x, y) do geom; usa sub-geom mais longa se multi."""
+        """Lista de (x, y) do geom; sub-geom mais longa para MultiLineString."""
         if geom.geom_type == "LineString":
             return list(geom.coords)
         if geom.geom_type == "MultiLineString":
@@ -1104,6 +1113,13 @@ def render_percurso(
         dx = coords[-1][0] - coords[0][0]
         dy = coords[-1][1] - coords[0][1]
         return math.degrees(math.atan2(dx, dy)) % 180.0
+
+    def _unit(pts):
+        """Vetor unitário na direção de viagem (primeiro → último ponto)."""
+        dx = pts[-1][0] - pts[0][0]
+        dy = pts[-1][1] - pts[0][1]
+        d  = math.hypot(dx, dy)
+        return (dx / d, dy / d) if d > 0 else (1.0, 0.0)
 
     # ── ordenar linhas perpendicular à direção dominante ───────────────────
     raw_c     = [_coords(g) for g in linhas_t.geometry]
@@ -1121,32 +1137,70 @@ def render_percurso(
         else linhas_t
     )
 
-    # ── percurso serpentino (linhas alternadas de direção) ─────────────────
+    # ── percurso serpentino — armazena coords projetadas E WGS84 ──────────
+    # Mantemos as coords no CRS projetado (metros) para calcular os desvios
+    # de cabeceira com grandeza física real; WGS84 para renderizar no Folium.
+    HEADLAND_M = 15.0  # distância de extensão além do limite da linha (m)
+
     path_data: list[dict] = []
-    for i, geom_wgs in enumerate(lt4326.geometry):
-        pts = _coords(geom_wgs)           # WGS84 → (lon, lat) pairs
-        if len(pts) < 2:
+    for i in range(len(linhas_t)):
+        pts_proj = _coords(linhas_t.geometry.iloc[i])   # coords projetadas
+        pts_wgs  = _coords(lt4326.geometry.iloc[i])     # coords WGS84 (lon, lat)
+        if len(pts_proj) < 2:
             continue
-        latlon = [[c[1], c[0]] for c in pts]   # Folium usa [lat, lon]
-        if i % 2 == 1:
-            latlon = latlon[::-1]               # retorno: inverte sentido
+        if i % 2 == 1:                                  # linha de retorno: inverter
+            pts_proj = pts_proj[::-1]
+            pts_wgs  = pts_wgs[::-1]
         row_s = linhas_t.iloc[i]
         path_data.append({
-            "latlon": latlon,
-            "fid":    row_s.get("FID", i + 1),
-            "comp":   float(row_s.get("comp_linha") or 0),
-            "ioi":    float(row_s.get("ioi") or 0),
+            "proj":  pts_proj,                              # (x, y) em metros
+            "latlon": [[c[1], c[0]] for c in pts_wgs],     # [lat, lon] para Folium
+            "fid":   row_s.get("FID", i + 1),
+            "comp":  float(row_s.get("comp_linha") or 0),
+            "ioi":   float(row_s.get("ioi") or 0),
         })
 
     if not path_data:
         st.warning("Não foi possível extrair coordenadas das linhas para este talhão.")
         return
 
-    # conexões de cabeceira: fim da linha i → início da linha i+1
-    turns = [
-        [path_data[i]["latlon"][-1], path_data[i + 1]["latlon"][0]]
-        for i in range(len(path_data) - 1)
-    ]
+    # ── manobras em U fora do talhão — calculadas no CRS projetado ─────────
+    #
+    #  saída_i ──► ext_saída (HEADLAND_M além do limite)
+    #                  │  (deslocamento lateral na cabeceira, fora do campo)
+    #              ext_entrada ──► entrada_i+1
+    #
+    # O segmento ext_saída → ext_entrada é paralelo ao eixo de linhas e
+    # ocorre completamente fora do talhão. Nenhum vértice cruza o interior.
+    turns_proj: list[list[tuple]] = []
+    for i in range(len(path_data) - 1):
+        saida   = path_data[i]["proj"][-1]       # último ponto da linha i
+        entrada = path_data[i + 1]["proj"][0]    # primeiro ponto da linha i+1
+        ux, uy  = _unit(path_data[i]["proj"])    # direção de saída da linha i
+
+        # Extensão HEADLAND_M além dos endpoints na direção de viagem
+        ext_saida   = (saida[0]   + ux * HEADLAND_M, saida[1]   + uy * HEADLAND_M)
+        ext_entrada = (entrada[0] + ux * HEADLAND_M, entrada[1] + uy * HEADLAND_M)
+
+        # Caminho em U: saída → ext_saída → ext_entrada → entrada
+        turns_proj.append([saida, ext_saida, ext_entrada, entrada])
+
+    # Conversão batch para WGS84 (uma única chamada to_crs)
+    turns_latlon: list[list] = []
+    if turns_proj and linhas_t.crs:
+        turn_gdf = gpd.GeoDataFrame(
+            geometry=[_LS(t) for t in turns_proj], crs=linhas_t.crs
+        ).to_crs(4326)
+        turns_latlon = [
+            [[c[1], c[0]] for c in g.coords]
+            for g in turn_gdf.geometry
+        ]
+    else:
+        # Fallback sem CRS: conecta diretamente pelos pontos WGS84 conhecidos
+        turns_latlon = [
+            [path_data[i]["latlon"][-1], path_data[i + 1]["latlon"][0]]
+            for i in range(len(path_data) - 1)
+        ]
 
     # ── mapa Folium ────────────────────────────────────────────────────────
     all_lats = [p[0] for r in path_data for p in r["latlon"]]
@@ -1189,39 +1243,37 @@ def render_percurso(
         ).add_to(fg_plant)
     fg_plant.add_to(m)
 
-    # Layer 2 — manobras na cabeceira (tracejado vermelho)
+    # Layer 2 — manobras na cabeceira (U externo ao talhão, tracejado vermelho)
     fg_turn = folium.FeatureGroup(name="Manobras na cabeceira", show=True)
-    for t in turns:
+    for t in turns_latlon:
         folium.PolyLine(
             locations=t,
             color="#C62828",
             weight=2.5,
             opacity=0.85,
             dash_array="8 5",
-            tooltip="Manobra na cabeceira",
+            tooltip="Manobra na cabeceira (fora do talhão)",
         ).add_to(fg_turn)
     fg_turn.add_to(m)
 
     # marcadores de entrada e saída
-    _icon_entrada = folium.DivIcon(
-        html='<div style="font-size:28px;line-height:1;'
-             'filter:drop-shadow(0 1px 3px #0009);">🟢</div>',
-        icon_size=(32, 32), icon_anchor=(16, 16),
-    )
-    _icon_saida = folium.DivIcon(
-        html='<div style="font-size:28px;line-height:1;'
-             'filter:drop-shadow(0 1px 3px #0009);">🔴</div>',
-        icon_size=(32, 32), icon_anchor=(16, 16),
-    )
     folium.Marker(
         location=path_data[0]["latlon"][0],
         tooltip="<b>▶ ENTRADA NO TALHÃO</b><br>Início da primeira linha",
-        icon=_icon_entrada,
+        icon=folium.DivIcon(
+            html='<div style="font-size:28px;line-height:1;'
+                 'filter:drop-shadow(0 1px 3px #0009);">🟢</div>',
+            icon_size=(32, 32), icon_anchor=(16, 16),
+        ),
     ).add_to(m)
     folium.Marker(
         location=path_data[-1]["latlon"][-1],
         tooltip="<b>■ SAÍDA DO TALHÃO</b><br>Fim da última linha",
-        icon=_icon_saida,
+        icon=folium.DivIcon(
+            html='<div style="font-size:28px;line-height:1;'
+                 'filter:drop-shadow(0 1px 3px #0009);">🔴</div>',
+            icon_size=(32, 32), icon_anchor=(16, 16),
+        ),
     ).add_to(m)
 
     folium.LayerControl(collapsed=False).add_to(m)
