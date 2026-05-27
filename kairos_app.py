@@ -1201,12 +1201,13 @@ Linhas com **IOI ≥ IOI mínimo** são exportadas para o piloto automático.
     st.divider()
 
     # ── Tabs ──────────────────────────────────────────────────────────────
-    tab_mapa, tab_rank, tab_talhao, tab_vpl, tab_linhas = st.tabs([
+    tab_mapa, tab_rank, tab_talhao, tab_vpl, tab_linhas, tab_percurso = st.tabs([
         "🗺️ Mapa",
         "🏆 Ranking de Linhas",
         "📊 Por Talhão",
         "📈 VPL 5 anos",
         "📋 Linhas",
+        "🚜 Logística de Percurso",
     ])
 
     with tab_mapa:
@@ -1233,6 +1234,133 @@ Linhas com **IOI ≥ IOI mínimo** são exportadas para o piloto automático.
 
     with tab_linhas:
         render_linhas_detalhe(gdf_linhas_eco)
+
+    with tab_percurso:
+        _DIAGRAMA_HTML = """
+<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:680px;margin:0 auto;padding:8px;
+            background:#FAFAFA;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.10);">
+  <p style="text-align:center;font-weight:700;color:#1B5E20;margin:0 0 10px;font-size:14px;">
+    🚜 Fluxo Operacional — Trator + Plantadora Kairos
+  </p>
+  <!-- ENTRADA -->
+  <div style="padding-left:82px;margin-bottom:2px;">
+    <span style="display:inline-block;background:#1565C0;color:#fff;font-size:10px;
+                 font-weight:700;padding:3px 14px;border-radius:4px 4px 0 0;letter-spacing:1px;">
+      ▼&nbsp;ENTRADA
+    </span>
+  </div>
+  <!-- Field box -->
+  <div style="display:flex;border:2.5px solid #4E342E;border-radius:4px;overflow:hidden;">
+    <!-- Left headland -->
+    <div style="width:80px;background:#D7CCC8;border-right:2px dashed #8D6E63;flex-shrink:0;
+                display:flex;flex-direction:column;align-items:center;justify-content:center;
+                padding:8px 4px;gap:4px;">
+      <span style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:9px;
+                   font-weight:700;color:#3E2723;letter-spacing:2px;">CABECEIRA</span>
+      <span style="font-size:20px;margin-top:6px;">↺</span>
+      <span style="font-size:8.5px;color:#5D4037;text-align:center;line-height:1.4;">
+        giro<br>obrigatório
+      </span>
+    </div>
+    <!-- Rows area -->
+    <div style="flex:1;background:#F1F8E9;display:flex;flex-direction:column;
+                justify-content:space-evenly;padding:10px 8px;gap:8px;
+                position:relative;min-height:190px;">
+      <!-- Row 1: L→R -->
+      <div style="display:flex;align-items:center;background:#C5E1A5;border-radius:3px;
+                  padding:5px 10px;border:1px solid #7CB342;gap:8px;">
+        <span style="font-size:18px;flex-shrink:0;line-height:1;">🚜</span>
+        <div style="flex:1;height:3px;border-radius:2px;
+                    background:repeating-linear-gradient(90deg,#33691E 0,#33691E 8px,transparent 8px,transparent 14px);">
+        </div>
+        <span style="font-size:22px;font-weight:900;color:#1B5E20;flex-shrink:0;line-height:1;">→</span>
+      </div>
+      <!-- Row 2: R→L -->
+      <div style="display:flex;align-items:center;background:#C5E1A5;border-radius:3px;
+                  padding:5px 10px;border:1px solid #7CB342;gap:8px;">
+        <span style="font-size:22px;font-weight:900;color:#1B5E20;flex-shrink:0;line-height:1;">←</span>
+        <div style="flex:1;height:3px;border-radius:2px;
+                    background:repeating-linear-gradient(270deg,#33691E 0,#33691E 8px,transparent 8px,transparent 14px);">
+        </div>
+        <span style="font-size:18px;flex-shrink:0;line-height:1;">🚜</span>
+      </div>
+      <!-- Row 3: L→R -->
+      <div style="display:flex;align-items:center;background:#C5E1A5;border-radius:3px;
+                  padding:5px 10px;border:1px solid #7CB342;gap:8px;">
+        <span style="font-size:18px;flex-shrink:0;line-height:1;">🚜</span>
+        <div style="flex:1;height:3px;border-radius:2px;
+                    background:repeating-linear-gradient(90deg,#33691E 0,#33691E 8px,transparent 8px,transparent 14px);">
+        </div>
+        <span style="font-size:22px;font-weight:900;color:#1B5E20;flex-shrink:0;line-height:1;">→</span>
+      </div>
+      <!-- Prohibition badge (centered, absolute) -->
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+                  background:rgba(183,28,28,.90);color:#fff;padding:5px 14px;
+                  border-radius:6px;font-size:10px;font-weight:700;border:2px solid #fff;
+                  white-space:nowrap;pointer-events:none;
+                  box-shadow:0 2px 8px rgba(0,0,0,.30);">
+        🚫&nbsp;SEM MANOBRAS NO CENTRO DO TALHÃO
+      </div>
+    </div>
+    <!-- Right headland -->
+    <div style="width:80px;background:#D7CCC8;border-left:2px dashed #8D6E63;flex-shrink:0;
+                display:flex;flex-direction:column;align-items:center;justify-content:center;
+                padding:8px 4px;gap:4px;">
+      <span style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:9px;
+                   font-weight:700;color:#3E2723;letter-spacing:2px;">CABECEIRA</span>
+      <span style="font-size:20px;margin-top:6px;">↻</span>
+      <span style="font-size:8.5px;color:#5D4037;text-align:center;line-height:1.4;">
+        giro<br>obrigatório
+      </span>
+    </div>
+  </div>
+  <!-- SAÍDA -->
+  <div style="display:flex;justify-content:flex-end;padding-right:82px;margin-top:2px;">
+    <span style="display:inline-block;background:#2E7D32;color:#fff;font-size:10px;
+                 font-weight:700;padding:3px 14px;border-radius:0 0 4px 4px;letter-spacing:1px;">
+      ▲&nbsp;SAÍDA
+    </span>
+  </div>
+</div>"""
+
+        _REGRAS_HTML = """
+<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:680px;margin:14px auto 0;
+            padding:12px 16px;background:#fff;border-radius:8px;
+            border-left:4px solid #2E7D32;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+  <p style="font-weight:700;color:#1B5E20;margin:0 0 10px;font-size:13px;">
+    📋 Padrão Operacional Obrigatório
+  </p>
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <span style="font-size:16px;flex-shrink:0;line-height:1.5;">🟢</span>
+      <span style="font-size:12px;color:#212121;line-height:1.6;">
+        <b>Tráfego em Linha Cheia:</b> O trator deve entrar na linha pelo início,
+        percorrer o comprimento total de forma contínua e realizar o giro apenas na
+        cabeceira. Paradas ou inversões intermediárias geram compactação localizada
+        e prejudicam a uniformidade do plantio.
+      </span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <span style="font-size:16px;flex-shrink:0;line-height:1.5;">🔴</span>
+      <span style="font-size:12px;color:#212121;line-height:1.6;">
+        <b>Proibição de Manobras Centrais:</b> É vedado cruzar ou cortar linhas no
+        interior do talhão. Todas as inversões de sentido devem ocorrer exclusivamente
+        nas cabeceiras delimitadas, preservando a estrutura do solo na zona produtiva.
+      </span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <span style="font-size:16px;flex-shrink:0;line-height:1.5;">⚡</span>
+      <span style="font-size:12px;color:#212121;line-height:1.6;">
+        <b>Eficiência de Percurso:</b> Manter velocidade e direção constantes durante
+        toda a passagem na linha otimiza a consistência do plantio, reduz o tempo de
+        ciclo e maximiza o rendimento operacional da plantadora (ha/h).
+      </span>
+    </div>
+  </div>
+</div>"""
+
+        st.markdown(_DIAGRAMA_HTML, unsafe_allow_html=True)
+        st.markdown(_REGRAS_HTML,   unsafe_allow_html=True)
 
     st.divider()
 
