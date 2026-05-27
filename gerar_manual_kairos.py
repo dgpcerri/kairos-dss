@@ -1,5 +1,5 @@
 """
-Gera o Manual Completo do Kairos DSS v4.0 em PDF.
+Gera o Manual Completo do Kairos DSS v5.0 em PDF.
 Execute: python gerar_manual_kairos.py
 """
 
@@ -30,6 +30,8 @@ CINZA_MEDIO   = HexColor("#9E9E9E")
 LARANJA       = HexColor("#E65100")
 LARANJA_BG    = HexColor("#FFF3E0")
 VERMELHO      = HexColor("#B71C1C")
+ROXO_ESCURO   = HexColor("#4A148C")
+ROXO_BG       = HexColor("#F3E5F5")
 PRETO         = HexColor("#212121")
 
 W, H = A4
@@ -101,9 +103,9 @@ def cabecalho_rodape(canvas, doc):
         canvas.rect(MARGEM, H - 1.5*cm, W - 2*MARGEM, 0.5*cm, fill=True, stroke=False)
         canvas.setFillColor(colors.white)
         canvas.setFont("Helvetica-Bold", 8)
-        canvas.drawString(MARGEM + 4, H - 1.25*cm, "KAIROS DSS — Manual do Usuário")
+        canvas.drawString(MARGEM + 4, H - 1.25*cm, "KAIROS DSS — Manual do Usuario")
         canvas.setFont("Helvetica", 8)
-        canvas.drawRightString(W - MARGEM - 4, H - 1.25*cm, "Agricef Kairos v4.0")
+        canvas.drawRightString(W - MARGEM - 4, H - 1.25*cm, "Agricef Kairos v5.0")
     canvas.setStrokeColor(VERDE_CLARO)
     canvas.setLineWidth(0.5)
     canvas.line(MARGEM, 1.3*cm, W - MARGEM, 1.3*cm)
@@ -205,7 +207,7 @@ def build_story():
          [Paragraph("MANUAL COMPLETO DO USUARIO", estilo("CapaManual",
              fontSize=14, textColor=AMARELO, fontName="Helvetica-Bold",
              alignment=TA_CENTER))],
-         [Paragraph("Versao 4.0  |  Agricef", estilo("CapaVer",
+         [Paragraph("Versao 5.0  |  Agricef", estilo("CapaVer",
              fontSize=11, textColor=HexColor("#C8E6C9"), fontName="Helvetica",
              alignment=TA_CENTER))],
         ],
@@ -224,7 +226,7 @@ def build_story():
 
     story.append(Paragraph(
         "Este manual descreve todos os parametros de entrada, telas, calculos e "
-        "interpretacoes do sistema Kairos DSS v4.0. Qualquer operador ou tecnico agricola "
+        "interpretacoes do sistema Kairos DSS v5.0. Qualquer operador ou tecnico agricola "
         "pode utilizar este documento como referencia completa.",
         estilo("CapaDesc", fontSize=11, textColor=HexColor("#555555"),
                alignment=TA_CENTER, fontName="Helvetica", leading=16)
@@ -238,23 +240,25 @@ def build_story():
     story.append(HRFlowable(width="100%", thickness=1.5, color=VERDE_CLARO, spaceAfter=10))
 
     sumario = [
-        ("1.",  "O que e o Kairos DSS v4.0",                       "3"),
-        ("2.",  "Como usar o programa — Passo a Passo",             "3"),
-        ("3.",  "Arquivos de Entrada",                              "4"),
-        ("4.",  "Parametros GIS (Processamento Espacial)",          "5"),
-        ("5.",  "Custos por Hora da Maquina",                       "6"),
-        ("6.",  "Velocidades e Logistica Operacional",              "8"),
-        ("7.",  "Producao Agronomica e Precificacao ATR",           "9"),
-        ("8.",  "Riscos",                                           "11"),
-        ("9.",  "Gatilho de Reforma",                               "11"),
-        ("10.", "Exportacao de Shapefiles",                         "12"),
-        ("11.", "Tela: Mapa Interativo",                            "13"),
-        ("12.", "Tela: Ranking por Linha",                          "14"),
-        ("13.", "Tela: Resumo por Talhao",                          "14"),
-        ("14.", "Tela: Detalhamento por Linha",                     "15"),
-        ("15.", "Formulas e Calculos Completos",                    "15"),
-        ("16.", "Interpretando os Resultados",                      "17"),
-        ("17.", "Tabela de Referencia — Valores Recomendados",      "18"),
+        ("1.",  "O que e o Kairos DSS v5.0",                        "3"),
+        ("2.",  "Como usar o programa — Passo a Passo",              "3"),
+        ("3.",  "Arquivos de Entrada",                               "4"),
+        ("4.",  "Parametros GIS (Processamento Espacial)",           "5"),
+        ("5.",  "Custos por Hora da Maquina",                        "7"),
+        ("6.",  "Cenario Economico (Otimista / Realista / Pessimista)","9"),
+        ("7.",  "Velocidades e Logistica Operacional",               "10"),
+        ("8.",  "Producao Agronomica e Precificacao ATR",            "11"),
+        ("9.",  "Riscos",                                            "13"),
+        ("10.", "Gatilho de Reforma",                                "13"),
+        ("11.", "Analise Financeira — VPL Diferencial",               "14"),
+        ("12.", "Exportacao de Shapefiles",                          "16"),
+        ("13.", "Tela: Mapa Interativo",                             "17"),
+        ("14.", "Tela: Ranking por Linha",                           "18"),
+        ("15.", "Tela: Resumo por Talhao",                           "19"),
+        ("16.", "Tela: Detalhamento por Linha",                      "19"),
+        ("17.", "Formulas e Calculos Completos",                     "20"),
+        ("18.", "Interpretando os Resultados",                       "23"),
+        ("19.", "Tabela de Referencia — Valores Recomendados",       "24"),
     ]
     for num, titulo, pag in sumario:
         story.append(Paragraph(
@@ -266,9 +270,9 @@ def build_story():
     story.append(PageBreak())
 
     # =========================================================================
-    # 1. O QUE É O KAIROS DSS v4.0
+    # 1. O QUE É O KAIROS DSS v5.0
     # =========================================================================
-    story.append(Paragraph("1. O que e o Kairos DSS v4.0", H1))
+    story.append(Paragraph("1. O que e o Kairos DSS v5.0", H1))
     story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
 
     story.append(Paragraph(
@@ -276,22 +280,25 @@ def build_story():
         "agricola a decidir <b>quais linhas de cana-de-acucar devem ser replantadas</b> pelo "
         "Kairos (plantadora automatica da Agricef), levando em conta nao apenas o tamanho das "
         "falhas, mas tambem a <b>viabilidade economica e operacional</b> de cada linha "
-        "individualmente.",
+        "individualmente. A versao 5.0 adiciona analise financeira por VPL (Valor Presente "
+        "Liquido), cenarios economicos, encargos trabalhistas reais e filtros avancados.",
         CORPO
     ))
     story.append(Spacer(1, 0.3*cm))
     story.append(caixa(
-        "O que o sistema faz (v4.0)",
+        "O que o sistema faz (v5.0)",
         "1. Le tres arquivos espaciais (shapefiles ZIP): contorno dos talhoes, linhas de plantio "
         "e falhas detectadas por drone.<br/>"
         "2. Recorta e processa as geometrias por talhao, calculando o comprimento e percentual "
-        "de falha de cada linha individualmente.<br/>"
-        "3. Aplica o modelo economico linha a linha com cinco componentes de tempo: plantio, "
-        "deslocamento, manobra, recarga e transferencia entre talhoes.<br/>"
-        "4. Calcula o IOI (Indice Operacional Integrado — R$/hora) de cada linha.<br/>"
-        "5. Classifica linhas em Viaveis (IOI >= IOI minimo) ou Inviaveis.<br/>"
-        "6. Gera recomendacao de Replantio ou Reforma por talhao com base no custo operacional.<br/>"
-        "7. Exporta shapefiles com apenas as linhas viaveis para uso no piloto automatico.",
+        "de falha de cada linha individualmente. Geometrias invalidas sao reparadas automaticamente.<br/>"
+        "3. Filtra linhas muito curtas (comprimento minimo configuravel) — exibidas em cinza no mapa.<br/>"
+        "4. Aplica o modelo economico linha a linha com cinco componentes de tempo e encargos "
+        "trabalhistas reais.<br/>"
+        "5. Calcula o IOI (Indice Operacional Integrado — R$/hora) e o Lucro Cessante por linha.<br/>"
+        "6. Aplica o cenario economico escolhido (Otimista / Realista / Pessimista).<br/>"
+        "7. Realiza analise VPL diferencial comparando Reforma AGORA vs Replantio + Reforma Deferida.<br/>"
+        "8. Gera recomendacao de Replantio ou Reforma baseada em custo operacional e VPL.<br/>"
+        "9. Exporta shapefiles com as linhas viaveis para uso no piloto automatico.",
         VERDE_MEDIO, VERDE_BG, VERDE_ESCURO
     ))
     story.append(Spacer(1, 0.3*cm))
@@ -322,18 +329,19 @@ def build_story():
         ("Passo 3 — Configurar os parametros",
          "Ajuste os parametros nas secoes da barra lateral conforme os dados reais da sua "
          "operacao. Os valores padrao sao uma referencia, mas devem ser calibrados para cada "
-         "fazenda."),
+         "fazenda. Atencao especial ao Fator de Encargos Trabalhistas e ao Cenario Economico."),
         ("Passo 4 — Clicar em PROCESSAR",
          "Clique no botao <b>PROCESSAR</b> no final da barra lateral. O sistema fara o "
          "processamento GIS (pode demorar 10 a 60 segundos). Qualquer mudanca nos parametros "
-         "GIS (buffer, espaçamento, comprimento minimo) exige novo clique em PROCESSAR."),
+         "GIS (buffer, espacamento, comprimento minimo de linha/falha) exige novo clique em PROCESSAR."),
         ("Passo 5 — Analisar os resultados",
-         "Use as 4 abas para analisar: Mapa (visualizacao espacial), Ranking por Linha "
+         "Use as 5 abas para analisar: Mapa (visualizacao espacial com 3 camadas), Ranking por Linha "
          "(lista por IOI dentro de cada talhao), Por Talhao (resumo com recomendacao de "
-         "reforma) e Linhas (detalhe individual com filtros)."),
+         "reforma), Linhas (detalhe individual com filtros) e VPL por Talhao (analise financeira)."),
         ("Passo 6 — Ajustar parametros economicos",
          "Qualquer mudanca nos parametros economicos (custos, producao, ATR, ciclo/soca, "
-         "riscos) recalcula automaticamente o IOI sem reprocessar os arquivos GIS."),
+         "riscos, cenario, encargos, WACC, produtividade de reforma) recalcula automaticamente o IOI e o VPL sem "
+         "reprocessar os arquivos GIS."),
         ("Passo 7 — Exportar",
          "Quando satisfeito com os resultados, clique em <b>Exportar SHPs Viaveis</b>. "
          "Os shapefiles serao gravados na pasta configurada, prontos para o piloto "
@@ -357,7 +365,8 @@ def build_story():
     story.append(Paragraph(
         "O sistema aceita tres camadas espaciais, cada uma comprimida em um arquivo ZIP. "
         "Todos os arquivos devem estar no mesmo Sistema de Referencia de Coordenadas (SRC) "
-        "projetado em metros (ex: SIRGAS 2000 / UTM).",
+        "projetado em metros (ex: SIRGAS 2000 / UTM). O sistema reprojecta automaticamente "
+        "se necessario.",
         CORPO
     ))
     story.append(Spacer(1, 0.3*cm))
@@ -392,8 +401,9 @@ def build_story():
         "Atencao — Formato do ZIP e CRS",
         "O ZIP deve conter os arquivos do shapefile na raiz (nao dentro de subpastas). "
         "Arquivos necessarios: arquivo.shp, arquivo.shx, arquivo.dbf, arquivo.prj. "
-        "O arquivo .prj e obrigatorio. O CRS deve ser projetado em metros (UTM) — "
-        "CRS geografico (graus) sera rejeitado com mensagem de erro.",
+        "O arquivo .prj e obrigatorio. Se o CRS for geografico (graus), o sistema detecta "
+        "automaticamente a zona UTM SIRGAS 2000 correspondente e reprojecta antes do "
+        "processamento. Arquivos sem .prj serao rejeitados.",
         AMARELO, AMARELO_BG, LARANJA
     ))
 
@@ -424,17 +434,46 @@ def build_story():
          "Distancia entre duas linhas de plantio adjacentes. Usado para calcular a area "
          "de falha em hectares: <b>Area (ha) = Comprimento Falha (m) x Espacamento (m) / 10.000.</b> "
          "Verifique o espacamento real do talhao."),
+        ("Comprimento minimo de linha (m)", "80,0 m",
+         "Linhas com comprimento total (apos recorte no talhao) menor que este valor sao "
+         "excluidas automaticamente. Aparecem em <b>cinza tracejado</b> no mapa (camada 3) "
+         "e NAO sao exportadas. Util para remover cabeceiras e linhas parciais. "
+         "<b>Recomendado: 50 a 150 m</b> dependendo do tamanho dos talhoes."),
     ]))
+
+    story.append(Spacer(1, 0.4*cm))
+    story.append(Paragraph("Melhorias GIS da v5.0", H2))
+    melhorias_gis = [
+        "<b>Deteccao automatica de UTM SIRGAS 2000:</b> se os dados estiverem em CRS geografico "
+        "(latitude/longitude), o sistema calcula a zona UTM correta a partir do centroide e "
+        "reprojecta todos os arquivos automaticamente.",
+        "<b>Reparo de geometrias (make_valid):</b> geometrias invalidas (auto-intersecoes, "
+        "aneis incorretos) sao reparadas usando o algoritmo make_valid do Shapely 2.x, "
+        "preservando a topologia. Em caso de falha do make_valid, aplica buffer(0) como fallback.",
+        "<b>Remocao de coordenadas Z (force_2D):</b> arquivos com altitude (3D) sao "
+        "automaticamente convertidos para 2D antes do processamento, evitando erros de "
+        "interseccao causados por inconsistencias na terceira dimensao.",
+        "<b>Protecao contra path traversal:</b> a extracao de ZIPs valida o caminho de "
+        "cada arquivo, impedindo que um ZIP malicioso grave arquivos fora do diretorio temporario.",
+        "<b>Linhas curtas excluidas (excluida_curta):</b> flag booleana adicionada a cada "
+        "linha. Quando True, a linha nao entra no calculo economico e nao e exportada, "
+        "mas permanece visivel no mapa para referencia espacial.",
+    ]
+    for m in melhorias_gis:
+        story.append(Paragraph(f"• {m}", BULLET))
 
     story.append(Spacer(1, 0.4*cm))
     story.append(Paragraph("Como o processamento GIS funciona por talhao", H2))
     etapas_gis = [
         "Recorta as linhas de plantio e falhas dentro do poligono do talhao.",
+        "Aplica force_2D (remove Z) e make_valid (repara geometrias) em todos os layers.",
+        "Reprojecta para UTM SIRGAS 2000 caso o CRS seja geografico.",
         "Atribui FID sequencial apos o recorte (evita duplicatas do clip).",
         "Recalcula comp_linha com a geometria recortada (comprimento real no talhao).",
+        "Marca linhas com comp_linha < comprimento_minimo_linha como excluida_curta=True.",
         "Aplica o buffer configurado ao redor das falhas, transformando-as em poligonos.",
         "Intersecta as linhas de plantio com os poligonos de falha.",
-        "Explode MultiLineStrings em segmentos individuais e filtra > comprimento minimo.",
+        "Explode MultiLineStrings em segmentos individuais e filtra > comprimento minimo de falha.",
         "Soma os comprimentos de falha por linha (soma_falhas) e calcula o percentual.",
         "Classifica cada linha em uma das 11 categorias de percentual de falha.",
     ]
@@ -495,16 +534,16 @@ def build_story():
     story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
 
     story.append(Paragraph(
-        "O custo por hora e calculado somando quatro componentes: diesel, mao de obra, "
-        "manutencao e depreciacao. Este valor escalara o custo de maquina por linha "
-        "conforme o tempo total de operacao.",
+        "O custo por hora e calculado somando quatro componentes: diesel, mao de obra "
+        "(com encargos trabalhistas), manutencao e depreciacao. Este valor escalara o "
+        "custo de maquina por linha conforme o tempo total de operacao.",
         CORPO
     ))
     story.append(Spacer(1, 0.3*cm))
-    story.append(Paragraph("Formula do Custo por Hora:", H2))
+    story.append(Paragraph("Formula do Custo por Hora (v5.0 — com encargos):", H2))
     story.append(Paragraph(
         "custo_hora = (diesel_lh x preco_diesel)<br/>"
-        "           + (salario_operador + n_auxiliares x salario_auxiliar) / horas_mes<br/>"
+        "           + (salario_op + n_aux x salario_aux) x fator_encargos / horas_mes<br/>"
         "           + manutencao_mensal / horas_mes<br/>"
         "           + (depreciacao_anual / 12) / horas_mes",
         FORMULA
@@ -516,23 +555,29 @@ def build_story():
          "Litros de diesel consumidos por hora de operacao. Consulte o manual da maquina "
          "ou meca em campo. <b>Recomendado: 6 a 12 L/h.</b>"),
         ("Preco do diesel (R$/L)", "R$ 6,50",
-         "Preco medio pago pelo litro de diesel na fazenda. Atualize conforme o preco atual."),
+         "Preco medio pago pelo litro de diesel na fazenda. Atualize conforme o preco atual. "
+         "O cenario Otimista reduz o diesel em 15%; o Pessimista aumenta em 15%."),
         ("Salario do operador (R$/mes)", "R$ 3.500",
-         "Salario bruto mensal do operador incluindo encargos sociais (INSS, FGTS). "
-         "<b>Inclua os encargos</b> — o custo real para a empresa e aproximadamente "
-         "1,7x o salario liquido."),
+         "Salario bruto mensal do operador (sem encargos). Os encargos sao calculados "
+         "automaticamente pelo Fator de Encargos configurado."),
         ("Numero de auxiliares", "1",
          "Quantidade de auxiliares de campo que acompanham a operacao. Use 0 se a "
          "operacao for apenas com o operador."),
         ("Salario por auxiliar (R$/mes)", "R$ 2.500",
-         "Salario bruto mensal de cada auxiliar, incluindo encargos."),
+         "Salario bruto mensal de cada auxiliar, sem encargos (encargos aplicados pelo fator)."),
+        ("Fator de encargos trabalhistas", "1,45",
+         "Multiplicador sobre os salarios para cobrir todos os encargos patronais: "
+         "INSS patronal (20%), FGTS (8%), 13o salario, ferias, provisoes diversas. "
+         "<b>1,30 = encargos minimos | 1,45 = padrao setor sucroalcooleiro | "
+         "1,60 = operacao com beneficios extras.</b> Consulte o depto de RH ou contabilidade."),
         ("Manutencao fixa mensal (R$/mes)", "R$ 800",
          "Custo medio mensal com manutencao preventiva e corretiva da maquina. "
          "<b>Recomendado: R$ 500 a R$ 2.000/mes.</b>"),
-        ("Depreciacao anual (R$/ano)", "R$ 36.000",
+        ("Depreciacao anual (R$/ano)", "R$ 100.000",
          "Quanto a maquina perde de valor por ano: "
          "<b>(Valor de compra - Valor residual) / Vida util em anos.</b> "
-         "Ex: maquina de R$ 400.000, residual R$ 40.000, vida util 10 anos = R$ 36.000/ano."),
+         "Ex: maquina de R$ 1.200.000, residual R$ 200.000, vida util 10 anos = R$ 100.000/ano. "
+         "Este e o valor padrao para o Kairos completo. Ajuste conforme o valor real."),
         ("Horas trabalhadas por mes (h/mes)", "176 h",
          "Total de horas que a maquina opera por mes. "
          "Padrao: 22 dias x 8 horas = 176 h."),
@@ -540,27 +585,91 @@ def build_story():
 
     story.append(Spacer(1, 0.3*cm))
     story.append(caixa(
-        "Exemplo de calculo — Custo por hora",
+        "Exemplo de calculo — Custo por hora (v5.0)",
         "Diesel: 8 L/h x R$ 6,50 = R$ 52,00/h<br/>"
-        "Mao de obra: (R$ 3.500 + 1 x R$ 2.500) / 176 h = R$ 34,09/h<br/>"
+        "Mao de obra: (R$ 3.500 + 1 x R$ 2.500) x 1,45 / 176 h = R$ 49,43/h<br/>"
         "Manutencao: R$ 800 / 176 h = R$ 4,55/h<br/>"
-        "Depreciacao: (R$ 36.000 / 12) / 176 h = R$ 17,05/h<br/>"
-        "<b>TOTAL: R$ 107,69/hora</b>",
+        "Depreciacao: (R$ 100.000 / 12) / 176 h = R$ 47,35/h<br/>"
+        "<b>TOTAL: R$ 153,33/hora</b><br/><br/>"
+        "Comparacao com v4.0 (sem encargos corretos, depreciacao R$ 36.000): R$ 107,69/h. "
+        "O custo mais realista reduz o numero de linhas viaveis — ajuste o ganho esperado "
+        "para corresponder.",
         VERDE_MEDIO, VERDE_BG, VERDE_ESCURO
+    ))
+
+    story.append(Spacer(1, 0.3*cm))
+    story.append(caixa(
+        "Nota sobre o Fator de Encargos Trabalhistas",
+        "No setor sucroalcooleiro brasileiro, os encargos patronais somados costumam "
+        "representar 40 a 60% do salario bruto. O fator 1,45 significa que para cada "
+        "R$ 1,00 de salario bruto, a empresa paga R$ 1,45 no total (salario + encargos). "
+        "Nao confundir com o antigo campo 'incluindo encargos' da v4.0, que exigia calcular "
+        "manualmente. Agora o salario informado e o salario bruto e o sistema aplica "
+        "o fator automaticamente.",
+        AMARELO, AMARELO_BG, LARANJA
     ))
 
     story.append(PageBreak())
 
     # =========================================================================
-    # 6. VELOCIDADES E LOGÍSTICA OPERACIONAL
+    # 6. CENÁRIO ECONÔMICO
     # =========================================================================
-    story.append(Paragraph("6. Velocidades e Logistica Operacional", H1))
+    story.append(Paragraph("6. Cenario Economico (Otimista / Realista / Pessimista)", H1))
     story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
 
     story.append(Paragraph(
-        "O modelo v4.0 usa <b>cinco componentes de tempo</b> por linha, substituindo o "
-        "modelo anterior de dois componentes. Isso permite representar com maior fidelidade "
-        "o tempo real consumido em campo.",
+        "O sistema v5.0 permite simular tres cenarios macroeconomicos distintos, "
+        "aplicando multiplicadores sobre as variaveis mais volateis: preco do ATR, "
+        "preco do diesel e taxa de pegamento. Use o cenario Realista para operacao normal; "
+        "o Otimista e o Pessimista para analise de sensibilidade antes de investir.",
+        CORPO
+    ))
+    story.append(Spacer(1, 0.3*cm))
+
+    cenario_tab = [
+        ["Cenario",    "Preco do ATR", "Preco do Diesel", "Taxa de Pegamento", "Uso recomendado"],
+        ["Otimista",   "+15%",         "-15%",            "+10 p.p.",           "Projecao favoravel — cana em alta, diesel barato"],
+        ["Realista",   "sem ajuste",   "sem ajuste",       "sem ajuste",        "Operacao cotidiana — parametros como configurados"],
+        ["Pessimista", "-15%",         "+15%",            "-15 p.p.",           "Pior caso — mercado desfavoravel, seca leve"],
+    ]
+    story.append(tabela_generica(cenario_tab, [2.5*cm, 2.5*cm, 3.0*cm, 3.2*cm, 5.5*cm]))
+    story.append(Spacer(1, 0.3*cm))
+
+    story.append(Paragraph("Como os multiplicadores sao aplicados", H2))
+    story.append(Paragraph(
+        "preco_diesel_ajustado = preco_diesel x diesel_mult",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "preco_atr_ajustado    = preco_atr x atr_mult",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "taxa_pegamento_aj     = taxa_pegamento x pegamento_mult  (clipado em [0, 100%])",
+        FORMULA
+    ))
+    story.append(Spacer(1, 0.2*cm))
+    story.append(caixa(
+        "Estrategia de analise de risco",
+        "Recomenda-se processar primeiro no cenario <b>Realista</b> para obter a base. "
+        "Em seguida, mude para <b>Pessimista</b>: linhas que se tornam inviaveis neste "
+        "cenario tem alto risco de nao se pagar em anos ruins. Use esta informacao para "
+        "priorizar apenas as linhas viaveis em todos os tres cenarios ('viabilidade robusta'). "
+        "O processamento GIS nao e refeito — apenas os calculos economicos mudam.",
+        AZUL_ESCURO, AZUL_BG, AZUL_ESCURO
+    ))
+
+    story.append(PageBreak())
+
+    # =========================================================================
+    # 7. VELOCIDADES E LOGÍSTICA OPERACIONAL
+    # =========================================================================
+    story.append(Paragraph("7. Velocidades e Logistica Operacional", H1))
+    story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
+
+    story.append(Paragraph(
+        "O modelo usa <b>cinco componentes de tempo</b> por linha, permitindo representar "
+        "com fidelidade o tempo real consumido em campo.",
         CORPO
     ))
     story.append(Spacer(1, 0.3*cm))
@@ -645,13 +754,13 @@ def build_story():
     story.append(PageBreak())
 
     # =========================================================================
-    # 7. PRODUÇÃO AGRONÔMICA E PRECIFICAÇÃO ATR
+    # 8. PRODUÇÃO AGRONÔMICA E PRECIFICAÇÃO ATR
     # =========================================================================
-    story.append(Paragraph("7. Producao Agronomica e Precificacao ATR", H1))
+    story.append(Paragraph("8. Producao Agronomica e Precificacao ATR", H1))
     story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
 
     story.append(Paragraph(
-        "O modelo v4.0 usa precificacao baseada em ATR (Acucar Total Recuperavel) e "
+        "O modelo usa precificacao baseada em ATR (Acucar Total Recuperavel) e "
         "aplica um fator de reducao por ciclo de soca, tornando a estimativa de receita "
         "mais precisa e alinhada com a pratica da usina.",
         CORPO
@@ -709,12 +818,13 @@ def build_story():
          "<b>Recomendado: 40 a 80 t/ha</b> antes do fator de soca."),
         ("Taxa de pegamento / germinacao (%)", "85%",
          "Percentual das mudas replantadas que efetivamente brotam. "
-         "<b>Recomendado: 70 a 90%.</b>"),
+         "<b>Recomendado: 70 a 90%.</b> O cenario Otimista aumenta em 10 p.p.; "
+         "o Pessimista reduz em 15 p.p."),
         ("Custo de muda (R$/ha de falha)", "R$ 400,00",
          "Custo do material de plantio (muda, tolete ou colmo) por hectare replantado. "
          "Inclua colheita e preparo da muda."),
         ("Custo de logistica de muda (R$/ha)", "R$ 50,00",
-         "Custo de frete e manuseio da muda até o campo. "
+         "Custo de frete e manuseio da muda ate o campo. "
          "Soma ao custo de muda para formar o custo total de insumos. "
          "<b>Recomendado: R$ 0 a R$ 200/ha</b> dependendo da distancia do viveiro."),
     ]))
@@ -756,9 +866,9 @@ def build_story():
     story.append(PageBreak())
 
     # =========================================================================
-    # 8. RISCOS
+    # 9. RISCOS
     # =========================================================================
-    story.append(Paragraph("8. Riscos", H1))
+    story.append(Paragraph("9. Riscos", H1))
     story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
 
     story.append(tabela_params([
@@ -773,14 +883,36 @@ def build_story():
          "ser mais seletivo e exigir uma margem minima de retorno por hora."),
     ]))
 
+    story.append(Spacer(1, 0.4*cm))
+    story.append(Paragraph("Lucro Cessante (novidade v5.0)", H2))
+    story.append(Paragraph(
+        "O <b>lucro cessante</b> representa a receita que a empresa DEIXA DE RECEBER nas "
+        "linhas inviaveis durante os anos em que optou por nao replantar. Este valor aparece "
+        "como metrica no dashboard e e exportado junto com os shapefiles. Serve para "
+        "quantificar o custo de inacao — ou seja, o quanto custa ignorar uma linha com falha.",
+        CORPO
+    ))
+    story.append(Paragraph(
+        "lucro_cessante = receita_liquida x anos_extensao_replantio  (linhas inviaveis)",
+        FORMULA
+    ))
+    story.append(Spacer(1, 0.2*cm))
+    story.append(caixa(
+        "Como usar o lucro cessante",
+        "Se o lucro cessante de um conjunto de linhas inviaveis for maior do que o custo "
+        "de operar mesmo com IOI marginal, pode valer a pena reduzir o IOI minimo e incluir "
+        "essas linhas. O lucro cessante tambem alimenta a analise VPL — ver secao 11.",
+        AZUL_ESCURO, AZUL_BG, AZUL_ESCURO
+    ))
+
     # =========================================================================
-    # 9. GATILHO DE REFORMA
+    # 10. GATILHO DE REFORMA
     # =========================================================================
-    story.append(Paragraph("9. Gatilho de Reforma", H1))
+    story.append(Paragraph("10. Gatilho de Reforma", H1))
     story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
 
     story.append(Paragraph(
-        "O sistema v4.0 usa uma comparacao de custos para recomendar reforma de talhao: "
+        "O sistema usa uma comparacao de custos para recomendar reforma de talhao: "
         "quando o custo operacional do replantio se aproxima do custo de reforma, "
         "pode ser mais economico reformar o talhao inteiro.",
         CORPO
@@ -796,7 +928,7 @@ def build_story():
          "Percentual do custo de reforma que, quando atingido pelo custo operacional de "
          "replantio, dispara a recomendacao de reforma. "
          "<b>Padrao: 80%</b> — se o custo de replantio supera 80% do custo de reforma, "
-         "reform e financeiramente mais eficiente."),
+         "reforma e financeiramente mais eficiente."),
     ]))
 
     story.append(Spacer(1, 0.3*cm))
@@ -814,30 +946,174 @@ def build_story():
         FORMULA
     ))
     story.append(Paragraph(
-        "SE custo_op_talhao >= limite_reforma  →  SUGERIR REFORMA",
+        "SE custo_op_talhao >= limite_reforma  ->  SUGERIR REFORMA",
         FORMULA
     ))
     story.append(Paragraph(
-        "SE custo_op_talhao <  limite_reforma  →  REPLANTIO",
+        "SE custo_op_talhao <  limite_reforma  ->  REPLANTIO",
         FORMULA
     ))
     story.append(Spacer(1, 0.3*cm))
     story.append(caixa(
-        "Exemplo de gatilho de reforma",
-        "Talhao com 10 ha, custo de reforma R$ 14.000/ha, limite 80%:<br/>"
-        "Custo de reforma: 10 x R$ 14.000 = R$ 140.000<br/>"
-        "Limite: R$ 140.000 x 80% = R$ 112.000<br/>"
-        "Se o custo operacional total das linhas superar R$ 112.000 → SUGERIR REFORMA.<br/>"
-        "A recomendacao aparece na aba <b>Por Talhao</b> do dashboard.",
+        "Complemento: use o VPL 5 Anos para confirmar",
+        "O gatilho de reforma baseado em custo e uma regra rapida. Para decisoes de alto "
+        "impacto, confirme usando a analise VPL diferencial da secao 11: ela compara fluxos de caixa "
+        "descontados de Reforma Total vs Replantio Pontual em um horizonte de 5 anos.",
         LARANJA, LARANJA_BG, LARANJA
     ))
 
     story.append(PageBreak())
 
     # =========================================================================
-    # 10. EXPORTAÇÃO
+    # 11. VPL — ANÁLISE DIFERENCIAL — NOVA SEÇÃO v5.0
     # =========================================================================
-    story.append(Paragraph("10. Exportacao de Shapefiles", H1))
+    story.append(Paragraph("11. Analise Financeira — VPL Diferencial (novidade v5.0)", H1))
+    story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
+
+    story.append(Paragraph(
+        "A aba <b>VPL por Talhao</b> compara duas estrategias exclusivas usando uma "
+        "<b>analise diferencial</b>: <b>Opcao A — Reforma AGORA</b> e "
+        "<b>Opcao B — Replantio Pontual + Reforma Deferida</b>. "
+        "A premissa fundamental e que, apos n anos (= <i>anos_extensao_replantio</i> arredondado), "
+        "ambas as opcoes resultam em um talhao reformado identico. "
+        "Os fluxos futuros comuns se cancelam — apenas os fluxos dentro dessa janela de "
+        "n anos importam para a decisao.",
+        CORPO
+    ))
+    story.append(Spacer(1, 0.3*cm))
+
+    story.append(tabela_params([
+        ("Produtividade apos reforma (t/ha)", "90 t/ha",
+         "Producao esperada do talhao inteiro apos a reforma (Cana-planta). Usado como base "
+         "para calcular as receitas anuais em AMBAS as opcoes. "
+         "<b>Diferente</b> do ganho_esperado_tha, que e o incremento por ha de falha replantada. "
+         "<b>Recomendado: 80 a 120 t/ha</b> conforme o historico da fazenda."),
+        ("WACC / Taxa de desconto (%)", "12%",
+         "Custo medio ponderado de capital usado para descontar os fluxos de caixa futuros. "
+         "Representa o custo de oportunidade do dinheiro. "
+         "<b>Recomendado: 8 a 18%</b>. Use a taxa SELIC + spread para empresas sem endividamento."),
+        ("Anos de extensao do replantio", "1,5 anos",
+         "Janela de comparacao: por quantos anos o replantio posterga a necessidade de reforma. "
+         "Define n = round(anos_extensao). <b>Recomendado: 1,0 a 3,0 anos</b> conforme o "
+         "ciclo de soca e a variedade utilizada."),
+    ]))
+
+    story.append(Spacer(1, 0.3*cm))
+    story.append(Paragraph("Opcao A — Reforma AGORA (janela de n anos)", H2))
+    story.append(Paragraph(
+        "Investe-se o CAPEX no ano 0 e colhe-se a producao reformada por n cortes, "
+        "comecanado em Cana-planta (fator 1,00) e decrescendo conforme o ciclo de soca:",
+        CORPO
+    ))
+    story.append(Paragraph(
+        "receita_base_ha = produtividade_reforma x pegamento x preco_efetivo x (1 - risco)",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "CAPEX           = area_ha x custo_reforma_ha",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "Fluxo A, ano 0  = -CAPEX",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "Fluxo A, ano t  = area_ha x receita_base_ha x FATOR_SOCA[Cana-planta + t - 1]   (t=1..n)",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "VPL_reforma     = SUM[ Fluxo_A_t / (1 + wacc)^t ]   para t=0..n",
+        FORMULA
+    ))
+
+    story.append(Spacer(1, 0.3*cm))
+    story.append(Paragraph("Opcao B — Replantio Pontual + Reforma Deferida (janela de n anos)", H2))
+    story.append(Paragraph(
+        "Investe-se apenas o custo operacional do Kairos no ano 0. O campo continua "
+        "produzindo com o ciclo de soca atual (decaindo). No final da janela (ano n) "
+        "o CAPEX de reforma e pago — descontado por n anos. A receita incremental das "
+        "falhas replantadas e distribuida uniformemente ao longo dos n anos:",
+        CORPO
+    ))
+    story.append(Paragraph(
+        "custo_op (ano 0)  = soma(custo_maquina) de todas as linhas viaveis do talhao",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "receita_anual_gap = receita_liquida_total_falhas / n",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "Fluxo B, ano 0    = -custo_op",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "Fluxo B, ano t    = area_ha x receita_base_ha x FATOR_SOCA[soca_atual + t - 1]",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "                  + receita_anual_gap",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "                  - CAPEX  (somente no ano n)",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "VPL_replantio     = SUM[ Fluxo_B_t / (1 + wacc)^t ]   para t=0..n",
+        FORMULA
+    ))
+
+    story.append(Spacer(1, 0.3*cm))
+    story.append(Paragraph("Decisao VPL e Payback", H2))
+    story.append(Paragraph(
+        "SE VPL_replantio > VPL_reforma   ->  REPLANTIO (adiar reforma e usar o Kairos)",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "SE VPL_reforma   > VPL_replantio ->  REFORMA (renovar o talhao agora)",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "SE ambos <= 0                    ->  Nenhuma opcao rentavel",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "payback_anos = custo_op / receita_anual_gap   (em quantos anos o Kairos se paga)",
+        FORMULA
+    ))
+    story.append(Spacer(1, 0.2*cm))
+
+    colunas_vpl = [
+        ["Coluna na aba VPL", "O que significa"],
+        ["Talhao",            "Identificador do talhao"],
+        ["Area (ha)",         "Area total do talhao (do contorno)"],
+        ["VPL Reforma (R$)",  "VPL da Opcao A: reformar agora e colher por n cortes"],
+        ["VPL Replantio (R$)","VPL da Opcao B: Kairos agora + reforma deferida ao final"],
+        ["Decisao VPL",       "REPLANTIO ou REFORMA (maior VPL) ou 'Nenhuma opcao rentavel'"],
+        ["Payback (anos)",    "Tempo para o incremento das falhas cobrir o custo operacional"],
+    ]
+    story.append(tabela_generica(colunas_vpl, [4.0*cm, 12.7*cm]))
+    story.append(Spacer(1, 0.3*cm))
+    story.append(caixa(
+        "Exemplo — talhao 50 ha, Soca1, n=3 anos, WACC 12%, prod. reforma 90 t/ha",
+        "<b>Opcao A (Reforma AGORA):</b>  CAPEX = R$ 700.000<br/>"
+        "  Producao anos 1-3 (Cana-planta, Soca1, Soca2): VPL_reforma = R$ 189.864<br/><br/>"
+        "<b>Opcao B (Replantio + Reforma Deferida):</b>  custo_op = R$ 5.000<br/>"
+        "  Producao anos 1-3 com soca decaindo (Soca1, Soca2, Soca3) + incremento falhas<br/>"
+        "  CAPEX deferido no ano 3: VPL_replantio = R$ 312.583<br/><br/>"
+        "<b>Decisao: REPLANTIO</b> — adiar a reforma e usar o Kairos agora e mais rentavel.<br/>"
+        "O mesmo talhao em <b>Soca4+</b> resultaria em VPL_replantio = R$ 158.112 "
+        "-> <b>REFORMA</b> (campo em declinio acelerado).",
+        ROXO_ESCURO, ROXO_BG, ROXO_ESCURO
+    ))
+
+    story.append(PageBreak())
+
+    # =========================================================================
+    # 12. EXPORTAÇÃO
+    # =========================================================================
+    story.append(Paragraph("12. Exportacao de Shapefiles", H1))
     story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
 
     story.append(tabela_params([
@@ -849,36 +1125,37 @@ def build_story():
 
     story.append(Paragraph("O que e exportado", H2))
     story.append(Paragraph(
-        "Sao exportadas somente as linhas com <b>IOI &gt;= IOI minimo</b> (viaveis). "
-        "Um arquivo .shp separado e gerado para cada talhao, nomeado como "
-        "<b>talhao_NOME.shp</b>. Cada arquivo contem as seguintes colunas:",
+        "Sao exportadas somente as linhas com <b>IOI &gt;= IOI minimo</b> (viaveis) e "
+        "<b>excluida_curta = False</b>. Um arquivo .shp separado e gerado para cada talhao, "
+        "nomeado como <b>talhao_NOME.shp</b>. Cada arquivo contem as seguintes colunas:",
         CORPO
     ))
     colunas_exp = [
         ["Coluna", "Descricao"],
-        ["TALHAO",       "Identificador do talhao"],
-        ["FID",          "Identificador unico da linha dentro do talhao"],
-        ["comp_linha",   "Comprimento total da linha dentro do talhao (metros)"],
-        ["soma_falhas",  "Comprimento total das falhas na linha (metros)"],
-        ["perc_falhas",  "Percentual de falha da linha (%)"],
-        ["classe",       "Classe de falha (ex: 8-10, >20)"],
-        ["ioi",          "IOI da linha (R$/hora) — indicador principal"],
-        ["eficiencia_pct","Eficiencia operacional da linha (%)"],
-        ["lucro",        "Lucro estimado da linha (R$)"],
-        ["geometry",     "Geometria da linha (LineString) — para uso no QGIS/piloto automatico"],
+        ["TALHAO",          "Identificador do talhao"],
+        ["FID",             "Identificador unico da linha dentro do talhao"],
+        ["comp_linha",      "Comprimento total da linha dentro do talhao (metros)"],
+        ["soma_falhas",     "Comprimento total das falhas na linha (metros)"],
+        ["perc_falhas",     "Percentual de falha da linha (%)"],
+        ["classe",          "Classe de falha (ex: 8-10, >20)"],
+        ["ioi",             "IOI da linha (R$/hora) — indicador principal"],
+        ["eficiencia_pct",  "Eficiencia operacional da linha (%)"],
+        ["lucro",           "Lucro estimado da linha (R$)"],
+        ["lucro_cessante",  "Receita perdida nas linhas inviaveis (R$) — zero nas viaveis exportadas"],
+        ["geometry",        "Geometria da linha (LineString) — para uso no QGIS/piloto automatico"],
     ]
     story.append(tabela_generica(colunas_exp, [3.5*cm, 13.2*cm]))
 
     story.append(PageBreak())
 
     # =========================================================================
-    # 11. MAPA
+    # 13. MAPA
     # =========================================================================
-    story.append(Paragraph("11. Tela: Mapa Interativo", H1))
+    story.append(Paragraph("13. Tela: Mapa Interativo", H1))
     story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
 
     story.append(Paragraph(
-        "O mapa exibe duas camadas sobrepostas que podem ser ligadas e desligadas "
+        "O mapa exibe tres camadas sobrepostas que podem ser ligadas e desligadas "
         "usando o controle de camadas no canto superior direito.",
         CORPO
     ))
@@ -886,13 +1163,18 @@ def build_story():
 
     camadas = [
         ("Camada 1: Todas as linhas (% Falha)",
-         "Mostra TODAS as linhas coloridas pela classe de percentual de falha "
+         "Mostra TODAS as linhas viaveis coloridas pela classe de percentual de falha "
          "(escala verde para preto). Use para visualizar a distribuicao espacial "
          "das falhas no campo. Tooltip: Talhao, FID, Comprimento, % Falha, Classe."),
-        ("Camada 2: Linhas viaveis",
+        ("Camada 2: Linhas viaveis (IOI >= IOI minimo)",
          "Mostra apenas as linhas com IOI >= IOI minimo, coloridas pela classe de falha. "
          "Use para ver exatamente quais linhas o Kairos deve operar. "
          "Tooltip: Talhao, FID, % Falha, Classe, IOI (R$/h), Lucro (R$), Viavel."),
+        ("Camada 3: Linhas curtas excluidas [NOVO v5.0]",
+         "Mostra em <b>cinza tracejado</b> as linhas com comprimento menor que o "
+         "'Comprimento minimo de linha' configurado. Estas linhas foram excluidas do "
+         "calculo economico e da exportacao. Util para verificar se o filtro esta "
+         "removendo linhas importantes por erro de configuracao."),
     ]
     for titulo, desc in camadas:
         story.append(caixa(titulo, desc, AZUL_ESCURO, AZUL_BG, AZUL_ESCURO))
@@ -902,21 +1184,22 @@ def build_story():
     story.append(caixa(
         "Legenda no canto do mapa",
         "A legenda fixa no canto inferior direito do mapa mostra as 11 cores e seus "
-        "respectivos percentuais de falha.",
+        "respectivos percentuais de falha, mais a cor cinza para linhas curtas excluidas.",
         VERDE_MEDIO, VERDE_BG, VERDE_ESCURO
     ))
 
     story.append(PageBreak())
 
     # =========================================================================
-    # 12. RANKING POR LINHA
+    # 14. RANKING POR LINHA
     # =========================================================================
-    story.append(Paragraph("12. Tela: Ranking por Linha", H1))
+    story.append(Paragraph("14. Tela: Ranking por Linha", H1))
     story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
 
     story.append(Paragraph(
         "Tabela com todas as linhas, ordenadas por IOI decrescente <b>dentro de cada talhao</b> "
-        "(ranking local, nao global). Linhas viaveis aparecem em verde; inviaveis em vermelho. "
+        "(ranking local, nao global). Linhas viaveis aparecem em verde; inviaveis em vermelho; "
+        "linhas curtas excluidas em cinza. "
         "O ranking reseta para 1 a cada novo talhao, refletindo a ordem real de prioridade de "
         "campo por area de operacao.",
         CORPO
@@ -925,14 +1208,14 @@ def build_story():
 
     colunas_rank = [
         ["Coluna", "O que significa"],
-        ["Ranking",        "Posicao no talhao (1 = maior IOI, mais rentavel naquele talhao)"],
-        ["Talhao",         "Identificador do talhao"],
-        ["FID",            "Identificador unico da linha"],
-        ["Comprimento (m)","Comprimento total da linha no talhao"],
-        ["Falhas (m)",     "Comprimento total das falhas na linha"],
-        ["Area falha (ha)","Falhas (m) x Espacamento / 10.000"],
-        ["% Falha",        "Percentual de falha da linha"],
-        ["Classe",         "Categoria de falha (0-2, 2-4, ..., >20)"],
+        ["Ranking",         "Posicao no talhao (1 = maior IOI, mais rentavel naquele talhao)"],
+        ["Talhao",          "Identificador do talhao"],
+        ["FID",             "Identificador unico da linha"],
+        ["Comprimento (m)", "Comprimento total da linha no talhao"],
+        ["Falhas (m)",      "Comprimento total das falhas na linha"],
+        ["Area falha (ha)", "Falhas (m) x Espacamento / 10.000"],
+        ["% Falha",         "Percentual de falha da linha"],
+        ["Classe",          "Categoria de falha (0-2, 2-4, ..., >20)"],
         ["T. Plantio (min)","Tempo efetivo de plantio"],
         ["T. Desloc (min)", "Tempo de deslocamento nas partes saudaveis"],
         ["T. Manobra (min)","Tempo fixo de manobra por linha"],
@@ -944,8 +1227,10 @@ def build_story():
         ["Custo Maquina (R$)","custo_hora x (T. Total / 60)"],
         ["Custo Insumos (R$)","area_falha_ha x (custo_muda + custo_logistica)"],
         ["Lucro (R$)",      "Receita Liquida - Custo Total"],
+        ["Lucro Cessante (R$)","Receita perdida por nao operar (linhas inviaveis)"],
         ["IOI (R$/h)",      "Lucro / (T. Total / 60) — indicador principal"],
         ["Viavel",          "SIM se IOI >= IOI minimo  |  NAO caso contrario"],
+        ["Excluida (curta)","SIM se comprimento < comprimento minimo de linha configurado"],
     ]
     story.append(tabela_generica(colunas_rank, [4.0*cm, 12.7*cm]))
     story.append(Spacer(1, 0.2*cm))
@@ -958,9 +1243,9 @@ def build_story():
     story.append(PageBreak())
 
     # =========================================================================
-    # 13. POR TALHÃO
+    # 15. POR TALHÃO
     # =========================================================================
-    story.append(Paragraph("13. Tela: Resumo por Talhao", H1))
+    story.append(Paragraph("15. Tela: Resumo por Talhao", H1))
     story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
 
     story.append(Paragraph(
@@ -976,21 +1261,32 @@ def build_story():
         ["Area (ha)",           "Area total do talhao calculada pela geometria do contorno"],
         ["Total Linhas",        "Total de linhas com falha no talhao"],
         ["Linhas Viaveis",      "Quantidade de linhas com IOI >= IOI minimo"],
+        ["Linhas Curtas Excl.", "Linhas removidas por serem menores que o comprimento minimo"],
         ["% Viaveis",           "Percentual de linhas viaveis no talhao"],
         ["% Medio Falha",       "Media do percentual de falha de todas as linhas do talhao"],
-        ["Area Falhas (ha)",    "Soma da area de falha (soma_falhas x espacamento / 10.000) de todas as linhas"],
+        ["Area Falhas (ha)",    "Soma da area de falha (soma_falhas x espacamento / 10.000)"],
         ["Custo Operacao (R$)", "Soma do custo de maquina de todas as linhas do talhao"],
         ["Lucro Estimado (R$)", "Soma do lucro das linhas viaveis do talhao"],
+        ["Lucro Cessante (R$)", "Soma do lucro cessante das linhas inviaveis"],
         ["Recomendacao",        "REPLANTIO ou SUGERIR REFORMA (baseado no gatilho de custo)"],
     ]
     story.append(tabela_generica(colunas_t, [4.2*cm, 12.5*cm]))
 
+    story.append(Spacer(1, 0.3*cm))
+    story.append(caixa(
+        "Aba VPL por Talhao — complementar ao Por Talhao",
+        "A aba 'VPL por Talhao' exibe as colunas VPL Reforma, VPL Replantio, Decisao VPL e "
+        "Payback (anos) para cada talhao, calculados pela analise diferencial de n anos. "
+        "Use em conjunto com a tabela Por Talhao para tomar decisoes mais embasadas.",
+        ROXO_ESCURO, ROXO_BG, ROXO_ESCURO
+    ))
+
     story.append(Spacer(1, 0.5*cm))
 
     # =========================================================================
-    # 14. LINHAS
+    # 16. LINHAS
     # =========================================================================
-    story.append(Paragraph("14. Tela: Detalhamento por Linha", H1))
+    story.append(Paragraph("16. Tela: Detalhamento por Linha", H1))
     story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
 
     story.append(Paragraph(
@@ -1001,42 +1297,52 @@ def build_story():
         "<b>Filtrar por talhao:</b> Seleciona um talhao especifico ou mostra todos.", BULLET))
     story.append(Paragraph(
         "<b>Apenas viaveis:</b> Quando marcado, mostra somente as linhas que serao exportadas "
-        "(IOI >= IOI minimo). Esta e a visualizacao mais direta do que o Kairos vai plantar.", BULLET))
+        "(IOI >= IOI minimo e nao excluidas por comprimento minimo). Esta e a visualizacao "
+        "mais direta do que o Kairos vai plantar.", BULLET))
     story.append(Paragraph(
         "As colunas exibidas incluem todos os cinco componentes de tempo, receita, custos, "
-        "lucro, IOI e ranking por talhao.", CORPO))
+        "lucro, lucro_cessante, IOI e ranking por talhao.", CORPO))
 
     story.append(PageBreak())
 
     # =========================================================================
-    # 15. FÓRMULAS COMPLETAS
+    # 17. FÓRMULAS COMPLETAS
     # =========================================================================
-    story.append(Paragraph("15. Formulas e Calculos Completos", H1))
+    story.append(Paragraph("17. Formulas e Calculos Completos", H1))
     story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
 
-    story.append(Paragraph("15.1 Metricas Espaciais (por linha)", H2))
+    story.append(Paragraph("17.1 Metricas Espaciais (por linha)", H2))
     formulas1 = [
         ("comp_linha (m)",    "Comprimento da linha apos recorte no talhao (geometria real)."),
         ("soma_falhas (m)",   "Soma dos segmentos de falha intersectados na linha."),
         ("perc_falhas (%)",   "soma_falhas / comp_linha x 100"),
         ("classe",            "Bin de perc_falhas: 0-2, 2-4, 4-6, 6-8, 8-10, 10-12, 12-14, 14-16, 16-18, 18-20, >20"),
         ("area_falha_ha (ha)","soma_falhas x espacamento / 10.000"),
+        ("excluida_curta",    "TRUE se comp_linha < comprimento_minimo_linha"),
     ]
     for nome, desc in formulas1:
         story.append(Paragraph(f"<b>{nome}:</b>  {desc}", FORMULA))
 
     story.append(Spacer(1, 0.3*cm))
-    story.append(Paragraph("15.2 Custo por Hora (escalar — igual para todas as linhas)", H2))
+    story.append(Paragraph("17.2 Custo por Hora — com Encargos (v5.0)", H2))
     story.append(Paragraph(
-        "custo_hora = (diesel_lh x preco_diesel)<br/>"
-        "           + (salario_op + n_aux x salario_aux) / horas_mes<br/>"
+        "custo_mao_obra_h = (salario_op + n_aux x salario_aux) x fator_encargos / horas_mes",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "custo_hora = (diesel_lh x preco_diesel_ajustado)<br/>"
+        "           + custo_mao_obra_h<br/>"
         "           + manutencao_mensal / horas_mes<br/>"
         "           + (depreciacao_anual / 12) / horas_mes",
         FORMULA
     ))
+    story.append(Paragraph(
+        "Nota: preco_diesel_ajustado = preco_diesel x diesel_mult (cenario economico)",
+        NOTA
+    ))
 
     story.append(Spacer(1, 0.3*cm))
-    story.append(Paragraph("15.3 Cinco Componentes de Tempo (por linha)", H2))
+    story.append(Paragraph("17.3 Cinco Componentes de Tempo (por linha)", H2))
     formulas_tempo = [
         ("vmpm_p (m/min)",         "velocidade_plantio_kmh x 1000 / 60"),
         ("vmpm_d (m/min)",         "velocidade_desloc_kmh x 1000 / 60"),
@@ -1053,58 +1359,123 @@ def build_story():
         story.append(Paragraph(f"<b>{nome}:</b>  {desc}", FORMULA))
 
     story.append(Spacer(1, 0.3*cm))
-    story.append(Paragraph("15.4 Modelo Economico (por linha)", H2))
+    story.append(Paragraph("17.4 Modelo Economico — por Linha", H2))
     formulas_eco = [
-        ("preco_efetivo_ton (R$/ton)", "atr_medio_kgton x preco_atr_rs_kg"),
+        ("preco_efetivo_ton (R$/ton)", "atr_medio_kgton x preco_atr_ajustado"),
+        ("preco_atr_ajustado",         "preco_atr_rs_kg x atr_mult  (cenario economico)"),
+        ("taxa_pegamento_aj (%)",      "taxa_pegamento x pegamento_mult  (cenario, clip 0-100)"),
         ("fator_soca",                 "1,00 / 0,90 / 0,80 / 0,70 / 0,65 conforme ciclo"),
         ("ganho_ajustado (t/ha)",      "ganho_esperado_tha x fator_soca"),
-        ("receita_bruta (R$)",         "area_falha_ha x ganho_ajustado x (taxa_pegamento/100) x preco_efetivo_ton"),
+        ("receita_bruta (R$)",         "area_falha_ha x ganho_ajustado x (taxa_pegamento_aj/100) x preco_efetivo_ton"),
         ("receita_liquida (R$)",       "receita_bruta x (1 - risco_climatico/100)"),
         ("custo_maquina (R$)",         "custo_hora x (tempo_total_min / 60)"),
         ("custo_insumos (R$)",         "area_falha_ha x (custo_muda_tha + custo_logistica_muda_ha)"),
         ("custo_total (R$)",           "custo_maquina + custo_insumos"),
         ("lucro (R$)",                 "receita_liquida - custo_total"),
         ("ioi (R$/h)",                 "lucro / (tempo_total_min / 60)  [ou -inf se tempo = 0]"),
-        ("viavel",                     "TRUE se ioi >= ioi_minimo"),
+        ("viavel",                     "TRUE se ioi >= ioi_minimo  E  excluida_curta = FALSE"),
+        ("lucro_cessante (R$)",        "receita_liquida x anos_extensao_replantio  (linhas inviaveis)"),
         ("ranking",                    "rank de ioi decrescente DENTRO do talhao (rank 1 = maior IOI local)"),
     ]
     for nome, desc in formulas_eco:
         story.append(Paragraph(f"<b>{nome}:</b>  {desc}", FORMULA))
 
     story.append(Spacer(1, 0.3*cm))
-    story.append(Paragraph("15.5 Metricas do Dashboard Principal", H2))
+    story.append(Paragraph("17.5 VPL Diferencial — por Talhao", H2))
+    story.append(Paragraph(
+        "FATOR_SOCA  = {cana-planta:1,00; soca1:0,90; soca2:0,80; soca3:0,70; soca4+:0,65}",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "n_anos      = max(round(anos_extensao_replantio), 1)  [janela de comparacao]",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "CAPEX       = area_ha x custo_reforma_ha",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "rec_base_ha = produtividade_reforma_tha x pegamento x preco_efetivo x (1-risco)",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "--- Opcao A: Reforma AGORA ---",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "FluxoA[0]   = -CAPEX",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "FluxoA[t]   = area_ha x rec_base_ha x FATOR_SOCA[Cana-planta + t - 1]  (t=1..n)",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "VPL_reforma = SUM[ FluxoA[t] / (1+wacc)^t ]  para t=0..n",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "--- Opcao B: Replantio + Reforma Deferida ---",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "FluxoB[0]   = -custo_op_total",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "FluxoB[t]   = area_ha x rec_base_ha x FATOR_SOCA[soca_atual + t - 1]",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "            + (rec_liq_total / n_anos)",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "            - CAPEX  (somente em t = n_anos)",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "VPL_replantio = SUM[ FluxoB[t] / (1+wacc)^t ]  para t=0..n",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "decisao_vpl: REPLANTIO se VPL_replantio > VPL_reforma, senao REFORMA",
+        FORMULA
+    ))
+    story.append(Paragraph(
+        "payback_anos = custo_op_total / (rec_liq_total / n_anos)",
+        FORMULA
+    ))
+
+    story.append(Spacer(1, 0.3*cm))
+    story.append(Paragraph("17.6 Metricas do Dashboard Principal", H2))
     formulas_dash = [
         ("Area Total de Falhas (ha)",    "soma(area_falha_ha) de todas as linhas viaveis"),
         ("Rendimento de Plantio (ha/h)", "Area Total de Falhas / soma(tempo_total_min/60) das linhas viaveis"),
-        ("Rendimento Minimo (ha/h)",     "custo_hora / (receita_liq_por_ha - custo_insumos_por_ha)"),
         ("Lucro Total (R$)",             "soma(lucro) de todas as linhas viaveis"),
+        ("Lucro Cessante Total (R$)",    "soma(lucro_cessante) de todas as linhas inviaveis"),
+        ("Linhas Curtas Excluidas",      "contagem de linhas com excluida_curta = TRUE"),
     ]
     for nome, desc in formulas_dash:
         story.append(Paragraph(f"<b>{nome}:</b>  {desc}", FORMULA))
-    story.append(Spacer(1, 0.2*cm))
-    story.append(Paragraph(
-        "O Rendimento Minimo indica quantos ha/h a operacao precisa atingir para cobrir "
-        "os custos. Se o Rendimento de Plantio for menor que o Rendimento Minimo, "
-        "a operacao global pode ter margem negativa.",
-        NOTA
-    ))
 
     story.append(PageBreak())
 
     # =========================================================================
-    # 16. INTERPRETANDO RESULTADOS
+    # 18. INTERPRETANDO RESULTADOS
     # =========================================================================
-    story.append(Paragraph("16. Interpretando os Resultados", H1))
+    story.append(Paragraph("18. Interpretando os Resultados", H1))
     story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
 
     story.append(Paragraph("O que fazer quando MUITAS linhas sao viaveis", H2))
     story.append(caixa(
         "Sintoma: quase todas as linhas tem IOI positivo",
         "Causa provavel: parametros de producao superestimados (ganho muito alto, ATR muito alto, "
-        "taxa de pegamento muito alta) ou custos subestimados.<br/><br/>"
-        "Solucao: reduza o <b>Ganho esperado</b> para 40 t/ha, verifique o ATR e preco reais, "
-        "aumente o risco climatico para valores mais conservadores. "
-        "O objetivo e que apenas linhas com falha significativa sejam viaveis.",
+        "taxa de pegamento muito alta) ou custos subestimados (fator de encargos muito baixo, "
+        "depreciacao muito baixa).<br/><br/>"
+        "Solucao: use o cenario <b>Pessimista</b> para stress-test. Reduza o Ganho esperado para "
+        "40 t/ha, verifique o ATR e preco reais, aumente o risco climatico para valores mais "
+        "conservadores. Confirme se o Fator de Encargos e pelo menos 1,40.",
         LARANJA, LARANJA_BG, LARANJA
     ))
     story.append(Spacer(1, 0.3*cm))
@@ -1112,13 +1483,25 @@ def build_story():
     story.append(Paragraph("O que fazer quando NENHUMA linha e viavel", H2))
     story.append(caixa(
         "Sintoma: zero linhas viaveis",
-        "Causa provavel: custo por hora muito alto, velocidade de plantio muito baixa, "
-        "ou a operacao realmente nao se paga.<br/><br/>"
+        "Causa provavel: custo por hora muito alto (verificar depreciacao e encargos), "
+        "velocidade de plantio muito baixa, ou a operacao realmente nao se paga.<br/><br/>"
         "Solucao: verifique o custo por hora no expander da tela principal, confirme as "
         "velocidades de plantio e deslocamento, reduza o IOI minimo para 0. "
         "Se mesmo com parametros realistas nao houver linhas viaveis, a operacao nao e "
         "economicamente recomendada para este talhao.",
         VERMELHO, HexColor("#FFEBEE"), VERMELHO
+    ))
+    story.append(Spacer(1, 0.3*cm))
+
+    story.append(Paragraph("O que fazer quando MUITAS linhas sao curtas/excluidas", H2))
+    story.append(caixa(
+        "Sintoma: muitas linhas cinzas no mapa (excluidas por comprimento)",
+        "Causa: o Comprimento Minimo de Linha esta muito alto para este talhao, "
+        "ou os dados de contorno nao estao alinhados corretamente com as linhas, "
+        "gerando clips muito curtos.<br/><br/>"
+        "Solucao: reduza o Comprimento Minimo de Linha (ex: de 80 m para 40 m), "
+        "verifique o shapefile de contorno e processe novamente.",
+        CINZA_MEDIO, CINZA_CLARO, PRETO
     ))
     story.append(Spacer(1, 0.3*cm))
 
@@ -1159,9 +1542,9 @@ def build_story():
     story.append(PageBreak())
 
     # =========================================================================
-    # 17. TABELA DE REFERÊNCIA
+    # 19. TABELA DE REFERÊNCIA
     # =========================================================================
-    story.append(Paragraph("17. Tabela de Referencia — Valores Recomendados", H1))
+    story.append(Paragraph("19. Tabela de Referencia — Valores Recomendados", H1))
     story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO, spaceAfter=8))
 
     story.append(Paragraph(
@@ -1176,11 +1559,13 @@ def build_story():
         ["Buffer falhas (m)",               "0,10",     "0,30",    "0,60",     "Tecnico GIS"],
         ["Min. falha (m)",                  "0,50",     "1,50",    "3,00",     "Agronomico"],
         ["Espacamento linhas (m)",          "0,80",     "1,50",    "1,80",     "Medir no campo"],
+        ["Comp. minimo linha (m)",          "20",       "80",      "200",      "Medir cabeceiras"],
         ["Diesel (L/h)",                    "4",        "8",       "14",       "Manual da maquina"],
         ["Preco diesel (R$/L)",             "5,00",     "6,50",    "8,00",     "NF de compra"],
         ["Salario operador (R$/mes)",       "2.500",    "3.500",   "6.000",    "RH da empresa"],
+        ["Fator encargos trabalhistas",     "1,30",     "1,45",    "1,60",     "RH / Contabilidade"],
         ["Manutencao (R$/mes)",             "300",      "800",     "2.500",    "Historico oficina"],
-        ["Depreciacao (R$/ano)",            "15.000",   "36.000",  "80.000",   "Contabilidade"],
+        ["Depreciacao (R$/ano)",            "30.000",   "100.000", "180.000",  "Contabilidade"],
         ["Horas/mes",                       "120",      "176",     "220",      "Registro de campo"],
         ["Vel. plantio (km/h)",             "1,0",      "2,0",     "3,5",      "GPS ou cronometro"],
         ["Vel. deslocamento (km/h)",        "3,0",      "5,0",     "8,0",      "GPS ou cronometro"],
@@ -1198,6 +1583,8 @@ def build_story():
         ["IOI minimo (R$/h)",               "0",        "0",       "200",      "Politica da empresa"],
         ["Custo reforma (R$/ha)",           "8.000",    "14.000",  "22.000",   "Orcamento agronomico"],
         ["Limite reforma (%)",              "50",       "80",      "100",      "Gestao financeira"],
+        ["WACC (%)",                        "8",        "12",      "20",       "Financeiro/Contabil"],
+        ["Anos extensao replantio",         "1,0",      "1,5",     "3,0",      "Agronomia/historico"],
     ]
     col_ref = [5.2*cm, 1.7*cm, 1.7*cm, 1.7*cm, 6.4*cm]
     t_ref = Table(
@@ -1227,14 +1614,15 @@ def build_story():
         "apos uma safra de replantio, meca a producao das linhas replantadas e compare com o "
         "ganho esperado configurado. Ajuste o ATR, o fator de pegamento e o ganho esperado "
         "para que o modelo reflita a realidade da sua fazenda. Com parametros calibrados, "
-        "o IOI passa a ser um indicador preciso de rentabilidade por hora de maquina.",
+        "o IOI passa a ser um indicador preciso de rentabilidade por hora de maquina, e o "
+        "VPL Diferencial passa a ser uma ferramenta confiavel de decisao de reforma.",
         VERDE_MEDIO, VERDE_BG, VERDE_ESCURO
     ))
 
     story.append(Spacer(1, 0.5*cm))
     story.append(HRFlowable(width="100%", thickness=1, color=VERDE_CLARO))
     story.append(Paragraph(
-        "Kairos DSS v4.0 — Agricef  |  Manual gerado automaticamente",
+        "Kairos DSS v5.0 — Agricef  |  Manual gerado automaticamente",
         CAPTION
     ))
 
@@ -1251,7 +1639,7 @@ if __name__ == "__main__":
         rightMargin=MARGEM,
         topMargin=2.2*cm,
         bottomMargin=1.8*cm,
-        title="Kairos DSS v4.0 — Manual Completo do Usuario",
+        title="Kairos DSS v5.0 — Manual Completo do Usuario",
         author="Agricef",
         subject="Manual do Sistema de Apoio a Decisao para Replantio de Cana",
     )
