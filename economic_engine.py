@@ -240,8 +240,8 @@ def calcular_vpl_talhao(
     custo_op_replantio: float,
     receita_liquida_replantio: float,
     custo_reforma_ha: float,
-    produtividade_reforma_tha: float,   # produtividade PLENA do talhão reformado (t/ha)
-    ganho_esperado_tha: float,          # ganho incremental por ha de FALHA (Replantio Pontual)
+    produtividade_reforma_tha: float,
+    ganho_esperado_tha: float,          # não usado no VPL — mantido por compatibilidade
     preco_efetivo_ton: float,
     pegamento_pct: float,
     risco_climatico_pct: float,
@@ -249,53 +249,63 @@ def calcular_vpl_talhao(
     anos_extensao_replantio: float,
     wacc_pct: float,
 ) -> dict[str, float | str]:
-    """Compara VPL da Reforma Total vs VPL do Replantio Pontual (5 anos).
+    """Análise diferencial: Reforma AGORA vs Replantio + Reforma Deferida.
 
-    Premissas:
-        * Reforma Total: CAPEX no ano 0; receita calculada sobre TODA a área
-          do talhão usando `produtividade_reforma_tha` (produtividade plena
-          do talhão após reforma — distinto do ganho incremental do Kairos).
-          5 cortes com decaimento conforme FATOR_SOCA a partir de Cana-planta.
-        * Replantio Pontual: CUSTO_OP no ano 0; receita_liquida_replantio
-          (extra das falhas replantadas) distribuída pelos próximos
-          `anos_extensao_replantio` cortes, mantendo a soca atual e
-          decaindo conforme FATOR_SOCA.
-        * Receita por hectare (reforma) = produtiv_reforma × pegamento × preço × (1 − risco).
-        * Os anos da safra são tratados como anuais (1 corte = 1 ano).
+    Premissa fundamental: após n = round(anos_extensao_replantio) anos, AMBOS
+    os cenários possuem um talhão reformado idêntico. Os fluxos futuros comuns
+    se cancelam — só os fluxos dentro da janela de n anos importam.
 
-    Returns:
-        dict com vpl_reforma, vpl_replantio, decisao_vpl, payback_replantio
+    Opção A — Reforma AGORA (janela de n anos):
+        Ano 0 : −CAPEX  (area_ha × custo_reforma_ha)
+        Anos 1..n : produção plena reformada (Cana-planta → soca crescente)
+                    = area_ha × produtividade_reforma_tha × peg × preço × (1−risco)
+                      × FATOR_SOCA[Cana-planta + t − 1]
+
+    Opção B — Replantio Pontual + Reforma Deferida (janela de n anos):
+        Ano 0 : −custo_op  (Kairos)
+        Anos 1..n : produção atual (soca decaindo) + incremental das falhas
+                    = area_ha × produtividade_reforma_tha × peg × preço × (1−risco)
+                      × FATOR_SOCA[soca_atual + t − 1]
+                    + receita_liquida_replantio / n
+        Ano n (no fim): −CAPEX deferido  (entra no fluxo do ano n descontado)
+
+    Resultado: VPL_A > VPL_B → Reforma vantajosa AGORA.
+               VPL_B > VPL_A → Vale a pena adiar a reforma e replantar com o Kairos.
+
+    Payback: custo_op / receita_anual_incremental  (retorno do investimento no Kairos).
     """
-    wacc = max(wacc_pct / 100.0, 0.0)
-    peg  = pegamento_pct / 100.0
-    risc = 1.0 - risco_climatico_pct / 100.0
+    wacc  = max(wacc_pct / 100.0, 0.0)
+    peg   = pegamento_pct / 100.0
+    risc  = 1.0 - risco_climatico_pct / 100.0
+    capex = area_ha * custo_reforma_ha
 
-    # ── Reforma: receita baseada na produtividade PLENA do talhão ──────
-    # Usa produtividade_reforma_tha (ex: 90 t/ha), não o ganho incremental
-    # do Kairos (ganho_esperado_tha = toneladas por ha de FALHA).
-    receita_reforma_base_ha = produtividade_reforma_tha * peg * preco_efetivo_ton * risc
+    # Receita por ha/corte do talhão reformado (sem fator soca)
+    receita_base_ha = produtividade_reforma_tha * peg * preco_efetivo_ton * risc
 
-    fluxos_reforma: list[float] = [-area_ha * custo_reforma_ha]
-    for ciclo in CICLO_ORDEM:
-        fator = FATOR_SOCA[ciclo]
-        receita_ano = area_ha * receita_reforma_base_ha * fator
-        fluxos_reforma.append(receita_ano)
-    vpl_reforma = _vpl(fluxos_reforma, wacc)
+    n_anos = max(int(round(anos_extensao_replantio)), 1)  # janela de comparação
 
-    # ── Replantio Pontual ──────────────────────────────────────────────
-    # Distribui receita_liquida_replantio em N anos a partir da soca atual.
     try:
         idx_inicio = CICLO_ORDEM.index(soca_atual)
     except ValueError:
         idx_inicio = 0
-    receita_total_replantio = receita_liquida_replantio  # já líquida de risco
-    n_anos = max(int(round(anos_extensao_replantio)), 1)
+
+    receita_anual_gap = receita_liquida_replantio / n_anos  # incremental Kairos/ano
+
+    # ── Opção A: Reforma AGORA ─────────────────────────────────────────
+    fluxos_reforma: list[float] = [-capex]
+    for t in range(1, n_anos + 1):
+        ciclo_idx = min(t - 1, len(CICLO_ORDEM) - 1)   # começa em Cana-planta
+        fluxos_reforma.append(area_ha * receita_base_ha * FATOR_SOCA[CICLO_ORDEM[ciclo_idx]])
+    vpl_reforma = _vpl(fluxos_reforma, wacc)
+
+    # ── Opção B: Replantio + Reforma Deferida ─────────────────────────
+    # O CAPEX deferido é embutido no fluxo do último ano da janela.
     fluxos_replantio: list[float] = [-custo_op_replantio]
-    receita_anual_replantio = receita_total_replantio / n_anos
-    for k in range(n_anos):
-        idx = min(idx_inicio + k, len(CICLO_ORDEM) - 1)
-        fator_decay = FATOR_SOCA[CICLO_ORDEM[idx]] / FATOR_SOCA[soca_atual]
-        fluxos_replantio.append(receita_anual_replantio * fator_decay)
+    for t in range(1, n_anos + 1):
+        idx  = min(idx_inicio + (t - 1), len(CICLO_ORDEM) - 1)
+        rec_campo = area_ha * receita_base_ha * FATOR_SOCA[CICLO_ORDEM[idx]]
+        capex_def = -capex if t == n_anos else 0.0      # paga o CAPEX no final da janela
+        fluxos_replantio.append(rec_campo + receita_anual_gap + capex_def)
     vpl_replantio = _vpl(fluxos_replantio, wacc)
 
     # ── Decisão ────────────────────────────────────────────────────────
@@ -306,10 +316,10 @@ def calcular_vpl_talhao(
     else:
         decisao = "REFORMA (VPL maior)"
 
-    # Payback simplificado do replantio (anos)
+    # Payback do Kairos: tempo para o incremento das falhas cobrir o custo op
     payback = None
-    if custo_op_replantio > 0 and receita_anual_replantio > 0:
-        payback = custo_op_replantio / receita_anual_replantio
+    if custo_op_replantio > 0 and receita_anual_gap > 0:
+        payback = custo_op_replantio / receita_anual_gap
 
     return {
         "vpl_reforma":   round(vpl_reforma, 2),
