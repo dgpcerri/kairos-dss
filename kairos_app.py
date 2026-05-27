@@ -1211,41 +1211,81 @@ def render_percurso(
         st.warning("Não foi possível extrair coordenadas das linhas para este talhão.")
         return
 
-    # ── manobras na cabeceira — U-turn com tangente local ───────────────────
+    # ── manobras na cabeceira ─────────────────────────────────────────────────
     #
-    # Para linhas CURVAS (pivô, leque), o bearing global médio não representa
-    # a direção real de saída de cada linha.  Usamos a tangente local:
-    #   • ext_saida  = último ponto + HEADLAND_M × direção do último segmento
-    #   • ext_entrada = primeiro ponto − HEADLAND_M × direção do primeiro segmento
-    # Isso garante que a extensão segue a direção real em que o trator sai/entra,
-    # mantendo a manobra fora da área cultivada independente da curvatura.
+    # Dois passos:
+    # 1. Extensão pela tangente local  (saida→ext_s, ext_e→entrada)
+    #    Cada endpoint é estendido HEADLAND_M na direção real do segmento
+    #    da linha, garantindo que o trator sai/entra perpendicularmente
+    #    ao bordo do talhão, independente da curvatura das linhas.
     #
-    def _local_dir(pts, at_end: bool):
-        """Vetor unitário da direção local (último ou primeiro segmento)."""
-        if at_end:
-            dx = pts[-1][0] - pts[-2][0]
-            dy = pts[-1][1] - pts[-2][1]
+    # 2. Segmento lateral roteado pelo anel do convex hull dos endpoints
+    #    O convex hull de todos os pontos de cabeça (primeiro/último de cada
+    #    linha) é uma envolvente convexa que fica FORA de qualquer linha.
+    #    Rotear o segmento lateral por esse anel garante que ele nunca cruza
+    #    o interior cultivado — para qualquer forma de talhão (reto, leque,
+    #    pivô, ferradura, etc.).
+    #
+    import bisect
+    from shapely.geometry import Point as _Pt, MultiPoint as _MPt
+
+    # Anel do convex hull de todos os endpoints das linhas
+    _ep_pts = [_Pt(p) for pd_ in path_data for p in (pd_["proj"][0], pd_["proj"][-1])]
+    _ch     = _MPt(_ep_pts).convex_hull.buffer(HEADLAND_M)
+    _hr     = _ch.exterior
+    _hr_len = _hr.length
+
+    _hrv  = list(_hr.coords)
+    _hrcum = [0.0]
+    for _k in range(1, len(_hrv)):
+        _hrcum.append(_hrcum[-1] + math.hypot(
+            _hrv[_k][0] - _hrv[_k-1][0], _hrv[_k][1] - _hrv[_k-1][1]))
+
+    def _hr_interp(d):
+        d = d % _hr_len
+        idx = min(max(0, bisect.bisect_right(_hrcum, d) - 1), len(_hrv) - 2)
+        seg = _hrcum[idx+1] - _hrcum[idx]
+        t   = (d - _hrcum[idx]) / seg if seg > 0 else 0.0
+        return (_hrv[idx][0] + t*(_hrv[idx+1][0]-_hrv[idx][0]),
+                _hrv[idx][1] + t*(_hrv[idx+1][1]-_hrv[idx][1]))
+
+    def _hr_arc(d1, d2):
+        fwd = (d2 - d1) % _hr_len
+        if fwd <= _hr_len / 2:
+            i1 = bisect.bisect_right(_hrcum, d1 % _hr_len)
+            i2 = bisect.bisect_left( _hrcum, d2 % _hr_len)
+            mid = _hrv[i1:i2] if i1 <= i2 else _hrv[i1:] + _hrv[:i2]
         else:
-            dx = pts[1][0] - pts[0][0]
-            dy = pts[1][1] - pts[0][1]
+            return _hr_arc(d2, d1)[::-1]
+        return [_hr_interp(d1)] + mid + [_hr_interp(d2)]
+
+    def _local_dir(pts, at_end: bool):
+        if at_end:
+            dx, dy = pts[-1][0]-pts[-2][0], pts[-1][1]-pts[-2][1]
+        else:
+            dx, dy = pts[1][0]-pts[0][0],  pts[1][1]-pts[0][1]
         L = math.hypot(dx, dy)
-        if L < 1e-9:             # segmento degenerado → bearing global
-            return (math.sin(bear_rad), math.cos(bear_rad))
-        return (dx / L, dy / L)
+        return (dx/L, dy/L) if L > 1e-9 else (math.sin(bear_rad), math.cos(bear_rad))
 
     turns_proj: list[list[tuple]] = []
     for i in range(len(path_data) - 1):
-        p_s = path_data[i]["proj"]
-        p_e = path_data[i + 1]["proj"]
+        p_s   = path_data[i]["proj"]
+        p_e   = path_data[i + 1]["proj"]
         saida   = p_s[-1]
         entrada = p_e[0]
-        d_s = _local_dir(p_s, at_end=True)    # direção de saída (último segmento)
-        d_e = _local_dir(p_e, at_end=False)   # direção de entrada (primeiro segmento, invertida)
+        d_s = _local_dir(p_s, at_end=True)
+        d_e = _local_dir(p_e, at_end=False)
         ext_s = (saida[0]   + HEADLAND_M * d_s[0],
                  saida[1]   + HEADLAND_M * d_s[1])
-        ext_e = (entrada[0] - HEADLAND_M * d_e[0],   # −: extensão para FORA antes de entrar
+        ext_e = (entrada[0] - HEADLAND_M * d_e[0],
                  entrada[1] - HEADLAND_M * d_e[1])
-        turns_proj.append([saida, ext_s, ext_e, entrada])
+        d1  = _hr.project(_Pt(ext_s))
+        d2  = _hr.project(_Pt(ext_e))
+        arc = _hr_arc(d1, d2)
+        # saida → ext_s  (cruza bordo: sai do talhão)
+        # ext_s → arc → ext_e  (roteado no anel externo: FORA do talhão)
+        # ext_e → entrada  (cruza bordo: entra no talhão)
+        turns_proj.append([saida, ext_s] + arc[1:-1] + [ext_e, entrada])
 
     # Conversão batch para WGS84 (uma única chamada to_crs)
     turns_latlon: list[list] = []
