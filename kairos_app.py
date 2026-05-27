@@ -1211,33 +1211,40 @@ def render_percurso(
         st.warning("Não foi possível extrair coordenadas das linhas para este talhão.")
         return
 
-    # ── manobras na cabeceira — U-turn externo ───────────────────────────────
+    # ── manobras na cabeceira — U-turn com tangente local ───────────────────
     #
-    # Estratégia: estende cada ponto de saída/entrada HEADLAND_M para fora
-    # da linha no sentido do bearing dominante, depois conecta lateralmente.
-    # Garante que a manobra fica do lado de fora para qualquer forma de
-    # talhão (reto, curvo, pivô/leque, etc.).
+    # Para linhas CURVAS (pivô, leque), o bearing global médio não representa
+    # a direção real de saída de cada linha.  Usamos a tangente local:
+    #   • ext_saida  = último ponto + HEADLAND_M × direção do último segmento
+    #   • ext_entrada = primeiro ponto − HEADLAND_M × direção do primeiro segmento
+    # Isso garante que a extensão segue a direção real em que o trator sai/entra,
+    # mantendo a manobra fora da área cultivada independente da curvatura.
     #
-    # Para linhas radiais (N-S, bearing ≈ 0°):
-    #   • Linhas pares  saem pelo Norte  → extensão +N (fora do arco externo)
-    #   • Linhas ímpares saem pelo Sul   → extensão -N (fora do arco interno)
-    # Para linhas tangenciais (L-O, bearing ≈ 90°):
-    #   • Extensão ±L → fora dos bordos radiais esquerdo/direito
-    #
-    bear_sin = math.sin(bear_rad)
-    bear_cos = math.cos(bear_rad)
+    def _local_dir(pts, at_end: bool):
+        """Vetor unitário da direção local (último ou primeiro segmento)."""
+        if at_end:
+            dx = pts[-1][0] - pts[-2][0]
+            dy = pts[-1][1] - pts[-2][1]
+        else:
+            dx = pts[1][0] - pts[0][0]
+            dy = pts[1][1] - pts[0][1]
+        L = math.hypot(dx, dy)
+        if L < 1e-9:             # segmento degenerado → bearing global
+            return (math.sin(bear_rad), math.cos(bear_rad))
+        return (dx / L, dy / L)
 
     turns_proj: list[list[tuple]] = []
     for i in range(len(path_data) - 1):
-        saida   = path_data[i]["proj"][-1]
-        entrada = path_data[i + 1]["proj"][0]
-        # Linhas pares saem pelo extremo positivo do bearing (+),
-        # ímpares pelo extremo negativo (−).
-        sign = 1.0 if i % 2 == 0 else -1.0
-        ext_s = (saida[0]   + sign * HEADLAND_M * bear_sin,
-                 saida[1]   + sign * HEADLAND_M * bear_cos)
-        ext_e = (entrada[0] + sign * HEADLAND_M * bear_sin,
-                 entrada[1] + sign * HEADLAND_M * bear_cos)
+        p_s = path_data[i]["proj"]
+        p_e = path_data[i + 1]["proj"]
+        saida   = p_s[-1]
+        entrada = p_e[0]
+        d_s = _local_dir(p_s, at_end=True)    # direção de saída (último segmento)
+        d_e = _local_dir(p_e, at_end=False)   # direção de entrada (primeiro segmento, invertida)
+        ext_s = (saida[0]   + HEADLAND_M * d_s[0],
+                 saida[1]   + HEADLAND_M * d_s[1])
+        ext_e = (entrada[0] - HEADLAND_M * d_e[0],   # −: extensão para FORA antes de entrar
+                 entrada[1] - HEADLAND_M * d_e[1])
         turns_proj.append([saida, ext_s, ext_e, entrada])
 
     # Conversão batch para WGS84 (uma única chamada to_crs)
