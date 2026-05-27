@@ -1114,19 +1114,18 @@ def render_percurso(
         dy = coords[-1][1] - coords[0][1]
         return math.degrees(math.atan2(dx, dy)) % 180.0
 
-    def _unit(pts):
-        """Vetor unitário na direção de viagem (primeiro → último ponto)."""
-        dx = pts[-1][0] - pts[0][0]
-        dy = pts[-1][1] - pts[0][1]
-        d  = math.hypot(dx, dy)
-        return (dx / d, dy / d) if d > 0 else (1.0, 0.0)
-
     # ── ordenar linhas perpendicular à direção dominante ───────────────────
+    # bear_rad é o bearing geográfico (ângulo a partir do Norte, sentido horário).
+    # Vetor de direção geográfica: (sin(bear), cos(bear)) em (Leste, Norte).
+    # Perpendicular (90° horário): (cos(bear), -sin(bear)) em (Leste, Norte).
+    # Sort key correto: x·cos(bear) - y·sin(bear)
+    # Exemplos: linhas N-S (0°) → ordena por x (Leste)  ✓
+    #           linhas L-O (90°) → ordena por -y (Norte) ✓
     raw_c     = [_coords(g) for g in linhas_t.geometry]
     med_bear  = float(np.median([_bearing(c) for c in raw_c if c])) if raw_c else 0.0
-    perp_rad  = math.radians((med_bear + 90.0) % 180.0)
+    bear_rad  = math.radians(med_bear)
     linhas_t["_sk"] = linhas_t.geometry.apply(
-        lambda g: g.centroid.x * math.cos(perp_rad) + g.centroid.y * math.sin(perp_rad)
+        lambda g: g.centroid.x * math.cos(bear_rad) - g.centroid.y * math.sin(bear_rad)
     )
     linhas_t = linhas_t.sort_values("_sk").reset_index(drop=True)
 
@@ -1140,7 +1139,15 @@ def render_percurso(
     # ── percurso serpentino — armazena coords projetadas E WGS84 ──────────
     # Mantemos as coords no CRS projetado (metros) para calcular os desvios
     # de cabeceira com grandeza física real; WGS84 para renderizar no Folium.
-    HEADLAND_M = 15.0  # distância de extensão além do limite da linha (m)
+    HEADLAND_M = 20.0  # distância de extensão além do limite da linha (m)
+
+    # Vetores de avanço no CRS projetado usando bearing mediano geográfico.
+    # Linhas pares (não invertidas) percorrem no sentido +fwd.
+    # Linhas ímpares (invertidas) percorrem no sentido -fwd.
+    # Usar o bearing MEDIANO garante que TODAS as extensões de cabeceira
+    # apontem para o mesmo lado do campo, independente da variação individual.
+    fwd_ux = math.sin(bear_rad)   # componente Leste do vetor de avanço
+    fwd_uy = math.cos(bear_rad)   # componente Norte do vetor de avanço
 
     path_data: list[dict] = []
     for i in range(len(linhas_t)):
@@ -1166,23 +1173,25 @@ def render_percurso(
 
     # ── manobras em U fora do talhão — calculadas no CRS projetado ─────────
     #
-    #  saída_i ──► ext_saída (HEADLAND_M além do limite)
-    #                  │  (deslocamento lateral na cabeceira, fora do campo)
+    #  saída_i ──► ext_saída  (HEADLAND_M na direção de saída da cabeceira)
+    #                  │  (deslocamento lateral, fora do campo)
     #              ext_entrada ──► entrada_i+1
     #
-    # O segmento ext_saída → ext_entrada é paralelo ao eixo de linhas e
-    # ocorre completamente fora do talhão. Nenhum vértice cruza o interior.
+    # A direção de extensão usa o bearing MEDIANO (fwd_ux, fwd_uy):
+    #   linha par  (i%2==0) sai pela cabeceira FRONTAL  → extensão +fwd
+    #   linha ímpar (i%2==1) sai pela cabeceira TRASEIRA → extensão -fwd
+    # Isso garante que ext_saída e ext_entrada estão sempre do mesmo lado
+    # do campo (mesma cabeceira), independente da variação individual de
+    # bearing de cada linha.
     turns_proj: list[list[tuple]] = []
     for i in range(len(path_data) - 1):
-        saida   = path_data[i]["proj"][-1]       # último ponto da linha i
-        entrada = path_data[i + 1]["proj"][0]    # primeiro ponto da linha i+1
-        ux, uy  = _unit(path_data[i]["proj"])    # direção de saída da linha i
+        saida   = path_data[i]["proj"][-1]
+        entrada = path_data[i + 1]["proj"][0]
+        ex = fwd_ux if i % 2 == 0 else -fwd_ux
+        ey = fwd_uy if i % 2 == 0 else -fwd_uy
 
-        # Extensão HEADLAND_M além dos endpoints na direção de viagem
-        ext_saida   = (saida[0]   + ux * HEADLAND_M, saida[1]   + uy * HEADLAND_M)
-        ext_entrada = (entrada[0] + ux * HEADLAND_M, entrada[1] + uy * HEADLAND_M)
-
-        # Caminho em U: saída → ext_saída → ext_entrada → entrada
+        ext_saida   = (saida[0]   + ex * HEADLAND_M, saida[1]   + ey * HEADLAND_M)
+        ext_entrada = (entrada[0] + ex * HEADLAND_M, entrada[1] + ey * HEADLAND_M)
         turns_proj.append([saida, ext_saida, ext_entrada, entrada])
 
     # Conversão batch para WGS84 (uma única chamada to_crs)
