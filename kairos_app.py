@@ -1145,7 +1145,7 @@ def render_percurso(
         pts_wgs  = _coords(lt4326.geometry.iloc[i])
         if len(pts_proj) < 2:
             continue
-        if i % 2 == 1:          # retorno: inverte sentido
+        if len(path_data) % 2 == 1:   # retorno: inverte sentido (baseado no índice real em path_data)
             pts_proj = pts_proj[::-1]
             pts_wgs  = pts_wgs[::-1]
         row_s = linhas_t.iloc[i]
@@ -1161,77 +1161,34 @@ def render_percurso(
         st.warning("Não foi possível extrair coordenadas das linhas para este talhão.")
         return
 
-    # ── anel de roteamento de cabeceira (exterior do polígono + buffer) ────
+    # ── manobras na cabeceira — U-turn externo ───────────────────────────────
     #
-    # Estratégia: projetamos cada ponto de saída/entrada no anel exterior
-    # do polígono ampliado por HEADLAND_M e seguimos o arco mais curto entre
-    # eles. Como o arco está FORA do polígono original, nenhum segmento de
-    # manobra pode cruzar o interior do talhão, independente da forma do campo.
+    # Estratégia: estende cada ponto de saída/entrada HEADLAND_M para fora
+    # da linha no sentido do bearing dominante, depois conecta lateralmente.
+    # Garante que a manobra fica do lado de fora para qualquer forma de
+    # talhão (reto, curvo, pivô/leque, etc.).
     #
-    from shapely.geometry import Point as _Pt
-    from shapely.ops import unary_union as _uu
-    import bisect
+    # Para linhas radiais (N-S, bearing ≈ 0°):
+    #   • Linhas pares  saem pelo Norte  → extensão +N (fora do arco externo)
+    #   • Linhas ímpares saem pelo Sul   → extensão -N (fora do arco interno)
+    # Para linhas tangenciais (L-O, bearing ≈ 90°):
+    #   • Extensão ±L → fora dos bordos radiais esquerdo/direito
+    #
+    bear_sin = math.sin(bear_rad)
+    bear_cos = math.cos(bear_rad)
 
-    # Polígono do talhão no CRS projetado
-    _fp = None
-    if gdf_contorno is not None and len(gdf_contorno) > 0:
-        _fc = [c for c in gdf_contorno.columns if c != "geometry"][0]
-        _tg = gdf_contorno[gdf_contorno[_fc].astype(str) == talhao_sel]
-        if len(_tg) > 0:
-            _src = _tg.to_crs(linhas_t.crs) if _tg.crs != linhas_t.crs else _tg
-            _fp  = _src.geometry.iloc[0]
-    if _fp is None:
-        _fp = _uu(linhas_t.geometry).convex_hull
-
-    # Anel do buffer externo (arco de manobra sempre corre sobre este anel)
-    _ring     = _fp.buffer(HEADLAND_M).exterior
-    _ring_len = _ring.length
-
-    # Pré-computar vértices e distâncias acumuladas para interpolação rápida
-    _rv   = list(_ring.coords)              # vértices do anel
-    _rcum = [0.0]
-    for _k in range(1, len(_rv)):
-        _dx = _rv[_k][0] - _rv[_k-1][0]
-        _dy = _rv[_k][1] - _rv[_k-1][1]
-        _rcum.append(_rcum[-1] + math.hypot(_dx, _dy))
-
-    def _ring_interp(d):
-        """Ponto no anel à distância d (interpolação linear entre vértices)."""
-        d = d % _ring_len
-        idx = max(0, bisect.bisect_right(_rcum, d) - 1)
-        idx = min(idx, len(_rv) - 2)
-        seg = _rcum[idx + 1] - _rcum[idx]
-        t   = (d - _rcum[idx]) / seg if seg > 0 else 0.0
-        return (
-            _rv[idx][0] + t * (_rv[idx+1][0] - _rv[idx][0]),
-            _rv[idx][1] + t * (_rv[idx+1][1] - _rv[idx][1]),
-        )
-
-    def _ring_arc(d1, d2):
-        """Arco mais curto no anel de d1 a d2, incluindo vértices intermediários."""
-        fwd = (d2 - d1) % _ring_len
-        if fwd <= _ring_len / 2:
-            # Arco dianteiro: d1 → d2
-            i1 = bisect.bisect_right(_rcum, d1 % _ring_len)
-            i2 = bisect.bisect_left( _rcum, d2 % _ring_len)
-            if i1 <= i2:
-                mid = _rv[i1:i2]
-            else:                       # atravessa o ponto de costura
-                mid = _rv[i1:] + _rv[:i2]
-        else:
-            # Arco traseiro: inverso de d2 → d1
-            return _ring_arc(d2, d1)[::-1]
-        return [_ring_interp(d1)] + mid + [_ring_interp(d2)]
-
-    # Constrói os segmentos de manobra roteados pelo anel
     turns_proj: list[list[tuple]] = []
     for i in range(len(path_data) - 1):
         saida   = path_data[i]["proj"][-1]
         entrada = path_data[i + 1]["proj"][0]
-        d1 = _ring.project(_Pt(saida))
-        d2 = _ring.project(_Pt(entrada))
-        arc = _ring_arc(d1, d2)
-        turns_proj.append([saida] + arc + [entrada])
+        # Linhas pares saem pelo extremo positivo do bearing (+),
+        # ímpares pelo extremo negativo (−).
+        sign = 1.0 if i % 2 == 0 else -1.0
+        ext_s = (saida[0]   + sign * HEADLAND_M * bear_sin,
+                 saida[1]   + sign * HEADLAND_M * bear_cos)
+        ext_e = (entrada[0] + sign * HEADLAND_M * bear_sin,
+                 entrada[1] + sign * HEADLAND_M * bear_cos)
+        turns_proj.append([saida, ext_s, ext_e, entrada])
 
     # Conversão batch para WGS84 (uma única chamada to_crs)
     turns_latlon: list[list] = []
