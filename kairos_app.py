@@ -1226,17 +1226,10 @@ def render_percurso(
     #    o interior cultivado — para qualquer forma de talhão (reto, leque,
     #    pivô, ferradura, etc.).
     #
-    import bisect
-    from shapely.geometry import Point as _Pt
+    from shapely.geometry import Point as _Pt, LineString as _LSc
     from shapely.ops import unary_union as _uu
 
-    # Anel de roteamento = convex hull do POLÍGONO DO TALHÃO + buffer.
-    #
-    # Por que convex hull e não o polígono diretamente?
-    # buffer() de um polígono CÔNCAVO (ferradura, ∩, U) cria um anel que
-    # passa pelo interior da área côncava — que ainda faz parte do talhão.
-    # O convex hull preenche todas as concavidades; seu buffer fica
-    # GARANTIDAMENTE fora do polígono original, para qualquer forma.
+    # Polígono do talhão para verificação de cruzamento
     _fp = None
     if gdf_contorno is not None and len(gdf_contorno) > 0:
         try:
@@ -1250,34 +1243,8 @@ def render_percurso(
             pass
     if _fp is None:
         _fp = _uu(linhas_t.geometry).convex_hull
-
-    _ch     = _fp.convex_hull.buffer(HEADLAND_M)
-    _hr     = _ch.exterior
-    _hr_len = _hr.length
-
-    _hrv  = list(_hr.coords)
-    _hrcum = [0.0]
-    for _k in range(1, len(_hrv)):
-        _hrcum.append(_hrcum[-1] + math.hypot(
-            _hrv[_k][0] - _hrv[_k-1][0], _hrv[_k][1] - _hrv[_k-1][1]))
-
-    def _hr_interp(d):
-        d = d % _hr_len
-        idx = min(max(0, bisect.bisect_right(_hrcum, d) - 1), len(_hrv) - 2)
-        seg = _hrcum[idx+1] - _hrcum[idx]
-        t   = (d - _hrcum[idx]) / seg if seg > 0 else 0.0
-        return (_hrv[idx][0] + t*(_hrv[idx+1][0]-_hrv[idx][0]),
-                _hrv[idx][1] + t*(_hrv[idx+1][1]-_hrv[idx][1]))
-
-    def _hr_arc(d1, d2):
-        fwd = (d2 - d1) % _hr_len
-        if fwd <= _hr_len / 2:
-            i1 = bisect.bisect_right(_hrcum, d1 % _hr_len)
-            i2 = bisect.bisect_left( _hrcum, d2 % _hr_len)
-            mid = _hrv[i1:i2] if i1 <= i2 else _hrv[i1:] + _hrv[:i2]
-        else:
-            return _hr_arc(d2, d1)[::-1]
-        return [_hr_interp(d1)] + mid + [_hr_interp(d2)]
+    # Erosão de 1m para não disparar em cruzamentos de borda
+    _fp_inner = _fp.buffer(-1.0) if _fp is not None else None
 
     def _local_dir(pts, at_end: bool):
         if at_end:
@@ -1299,13 +1266,23 @@ def render_percurso(
                  saida[1]   + HEADLAND_M * d_s[1])
         ext_e = (entrada[0] - HEADLAND_M * d_e[0],
                  entrada[1] - HEADLAND_M * d_e[1])
-        d1  = _hr.project(_Pt(ext_s))
-        d2  = _hr.project(_Pt(ext_e))
-        arc = _hr_arc(d1, d2)
-        # saida → ext_s  (cruza bordo: sai do talhão)
-        # ext_s → arc → ext_e  (roteado no anel externo: FORA do talhão)
-        # ext_e → entrada  (cruza bordo: entra no talhão)
-        turns_proj.append([saida, ext_s] + arc[1:-1] + [ext_e, entrada])
+
+        # Verifica se o segmento lateral (ext_s → ext_e) cruza o interior
+        lateral_ok = True
+        if _fp_inner is not None:
+            try:
+                lateral_ok = not _LSc([ext_s, ext_e]).intersects(_fp_inner)
+            except Exception:
+                lateral_ok = True
+
+        if lateral_ok:
+            # Manobra completa: sai → espaço externo → entra
+            turns_proj.append([saida, ext_s, ext_e, entrada])
+        else:
+            # Lateral cruzaria o talhão: mostra só as setas de saída/entrada
+            # O trator sai e entra perpendicularmente ao bordo — nunca cruza o interior
+            turns_proj.append([saida, ext_s])
+            turns_proj.append([ext_e, entrada])
 
     # Conversão batch para WGS84 (uma única chamada to_crs)
     turns_latlon: list[list] = []
