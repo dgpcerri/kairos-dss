@@ -1227,11 +1227,31 @@ def render_percurso(
     #    pivô, ferradura, etc.).
     #
     import bisect
-    from shapely.geometry import Point as _Pt, MultiPoint as _MPt
+    from shapely.geometry import Point as _Pt
+    from shapely.ops import unary_union as _uu
 
-    # Anel do convex hull de todos os endpoints das linhas
-    _ep_pts = [_Pt(p) for pd_ in path_data for p in (pd_["proj"][0], pd_["proj"][-1])]
-    _ch     = _MPt(_ep_pts).convex_hull.buffer(HEADLAND_M)
+    # Anel de roteamento = convex hull do POLÍGONO DO TALHÃO + buffer.
+    #
+    # Por que convex hull e não o polígono diretamente?
+    # buffer() de um polígono CÔNCAVO (ferradura, ∩, U) cria um anel que
+    # passa pelo interior da área côncava — que ainda faz parte do talhão.
+    # O convex hull preenche todas as concavidades; seu buffer fica
+    # GARANTIDAMENTE fora do polígono original, para qualquer forma.
+    _fp = None
+    if gdf_contorno is not None and len(gdf_contorno) > 0:
+        try:
+            _fc = [c for c in gdf_contorno.columns if c != "geometry"][0]
+            _tg = gdf_contorno[gdf_contorno[_fc].astype(str) == talhao_sel]
+            if len(_tg) > 0:
+                _src = (_tg.to_crs(linhas_t.crs)
+                        if _tg.crs and _tg.crs != linhas_t.crs else _tg)
+                _fp = _src.geometry.iloc[0]
+        except Exception:
+            pass
+    if _fp is None:
+        _fp = _uu(linhas_t.geometry).convex_hull
+
+    _ch     = _fp.convex_hull.buffer(HEADLAND_M)
     _hr     = _ch.exterior
     _hr_len = _hr.length
 
